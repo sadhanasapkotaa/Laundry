@@ -1,0 +1,205 @@
+# utils.py
+
+from django.contrib.auth import get_user_model
+from .models import Permission, RolePermission, UserPermission
+
+User = get_user_model()
+
+def has_permission(user, permission_codename):
+    """
+    Check if a user has a specific permission.
+    Returns True if user has the permission through role or individual assignment.
+    Individual permissions override role permissions.
+    """
+    if not user.is_authenticated:
+        return False
+    
+    # Check for individual permission override first
+    individual_perm = UserPermission.objects.filter(
+        user=user,
+        permission__codename=permission_codename
+    ).first()
+    
+    if individual_perm:
+        return individual_perm.is_granted
+    
+    # Check role permission
+    return RolePermission.objects.filter(
+        role=user.role,
+        permission__codename=permission_codename,
+        is_granted=True
+    ).exists()
+
+def get_user_permissions(user):
+    """
+    Get all effective permissions for a user.
+    Returns a list of permission codenames.
+    """
+    if not user.is_authenticated:
+        return []
+    
+    # Start with role permissions
+    role_permissions = set(
+        RolePermission.objects.filter(
+            role=user.role,
+            is_granted=True
+        ).values_list('permission__codename', flat=True)
+    )
+    
+    # Apply individual permission overrides
+    individual_permissions = UserPermission.objects.filter(user=user).select_related('permission')
+    
+    for individual_perm in individual_permissions:
+        if individual_perm.is_granted:
+            role_permissions.add(individual_perm.permission.codename)
+        else:
+            role_permissions.discard(individual_perm.permission.codename)
+    
+    return list(role_permissions)
+
+def create_default_permissions():
+    """
+    Create default permissions in the system.
+    Call this in a management command or migration.
+    """
+    default_permissions = [
+        # Branch Management
+        ('List branches', 'list_branches', 'View all branches in the system', 'branch'),
+        ('Add branch', 'add_branch', 'Create new branches', 'branch'),
+        ('Edit branch', 'edit_branch', 'Modify branch information', 'branch'),
+        ('Delete branch', 'delete_branch', 'Remove branches from the system', 'branch'),
+        
+        # Ride Management
+        ('View list of rides', 'list_rides', 'View all rides in the system', 'ride'),
+        ('Add pickups and drops for ride', 'add_ride_pickups', 'Add pickup and drop locations to rides', 'ride'),
+        ('Edit pickups and drops for ride', 'edit_ride_pickups', 'Modify pickup and drop locations', 'ride'),
+        ('Assign/unassign pickup and drop to rider', 'assign_ride_rider', 'Assign or unassign riders to pickups/drops', 'ride'),
+        
+        # User Management
+        ('List all users with roles', 'list_all_users', 'View all system users and their roles', 'user'),
+        ('Create all users', 'create_all_users', 'Create new users of any role', 'user'),
+        ('Edit all users', 'edit_all_users', 'Modify any user information', 'user'),
+        ('Delete all users', 'delete_all_users', 'Remove users from the system', 'user'),
+        
+        # Customer Management
+        ('List customers', 'list_customers', 'View customer list', 'customer'),
+        ('Create customers', 'create_customers', 'Create new customer accounts', 'customer'),
+        ('Edit customers', 'edit_customers', 'Modify customer information', 'customer'),
+        ('Delete customers', 'delete_customers', 'Remove customer accounts', 'customer'),
+        
+        # Financial Management
+        ('List income', 'list_income', 'View income records', 'finance'),
+        ('List expense', 'list_expense', 'View expense records', 'finance'),
+        ('View branch statistics', 'view_branch_statistics', 'View profit/loss, income/expense by branch', 'finance'),
+        ('Edit branch statistics', 'edit_branch_statistics', 'Modify branch financial data', 'finance'),
+        
+        # Service Management
+        ('Add service', 'add_service', 'Create new services', 'service'),
+        ('Edit service', 'edit_service', 'Modify service information', 'service'),
+        ('Delete service', 'delete_service', 'Remove services', 'service'),
+        
+        # Payment Management
+        ('View payment history', 'view_payment_history', 'View payment transaction history', 'payment'),
+        
+        # Order Management
+        ('List orders', 'list_orders', 'View all orders', 'order'),
+        ('Create order', 'create_order', 'Create new orders', 'order'),
+        ('Edit order', 'edit_order', 'Modify order information', 'order'),
+        ('Delete order', 'delete_order', 'Remove orders', 'order'),
+    ]
+    
+    created_permissions = []
+    
+    for name, codename, description, category in default_permissions:
+        permission, created = Permission.objects.get_or_create(
+            codename=codename,
+            defaults={
+                'name': name,
+                'description': description,
+                'category': category
+            }
+        )
+        if created:
+            created_permissions.append(permission)
+    
+    return created_permissions
+
+def setup_default_role_permissions():
+    """
+    Set up default permissions for each role.
+    Customize this based on your business logic.
+    """
+    # Admin gets all permissions
+    admin_permissions = Permission.objects.all()
+    for permission in admin_permissions:
+        RolePermission.objects.get_or_create(
+            role=User.Role.ADMIN,
+            permission=permission,
+            defaults={'is_granted': True}
+        )
+    
+    # Branch Manager permissions
+    branch_manager_permissions = Permission.objects.filter(
+        codename__in=[
+            'list_branches', 'edit_branch', 'view_branch_statistics',
+            'list_rides', 'add_ride_pickups', 'edit_ride_pickups', 'assign_ride_rider',
+            'list_customers', 'create_customers', 'edit_customers',
+            'list_income', 'list_expense', 'view_branch_statistics',
+            'view_payment_history',
+            'list_orders', 'create_order', 'edit_order'
+        ]
+    )
+    
+    for permission in branch_manager_permissions:
+        RolePermission.objects.get_or_create(
+            role=User.Role.BRANCH_MANAGER,
+            permission=permission,
+            defaults={'is_granted': True}
+        )
+    
+    # Rider permissions
+    rider_permissions = Permission.objects.filter(
+        codename__in=[
+            'list_rides', 'view_payment_history'
+        ]
+    )
+    
+    for permission in rider_permissions:
+        RolePermission.objects.get_or_create(
+            role=User.Role.RIDER,
+            permission=permission,
+            defaults={'is_granted': True}
+        )
+    
+    # Customer permissions (usually limited)
+    customer_permissions = Permission.objects.filter(
+        codename__in=[
+            'create_order', 'view_payment_history'
+        ]
+    )
+    
+    for permission in customer_permissions:
+        RolePermission.objects.get_or_create(
+            role=User.Role.CUSTOMER,
+            permission=permission,
+            defaults={'is_granted': True}
+        )
+
+# Custom permission classes for use in views
+from rest_framework.permissions import BasePermission
+
+class HasPermission(BasePermission):
+    """
+    Custom permission class that checks for specific permissions.
+    Usage: permission_classes = [HasPermission]
+    Set required_permission on the view.
+    """
+    def has_permission(self, request, view):
+        required_permission = getattr(view, 'required_permission', None)
+        if required_permission:
+            return has_permission(request.user, required_permission)
+        return True
+
+class HasAnyPermission(BasePermission):
+    """
+    Custom permission

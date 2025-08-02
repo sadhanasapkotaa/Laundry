@@ -1,0 +1,8 @@
+The user roles should be separated clearly with clear permissions. Everything should be super robust and secure. The users must have rbac. 
+
+Hi Claude, I want to build this system. Please make a detailed backend design for laundry chowk with an ER diagram where we have three roles, admin, rider, branch manager and customer.
+Admin can create branch, create branch managers, create customers, view/list, edit and delete all of them. They can also create edit and delete orders. They can also create bill for each order and track order payments. They can basically do everything that other roles can do too.
+Admin also gets an accounting tab where they can put in their expenses and income for each branch and calculate monthly profits. They also need to get to deliver salaries to their customers.
+Branch managers can create customers, create orders, track order's receiving time and order's delivery time and order's payment status, however they can only manage the orders created in their own branch. They can also manage pickup i.e. when a person orders for a pickup of the laundry, they can make a pick up ticket and drop tickets and assign a rider to make a pick.
+A rider sees a pick up order and the shortest route to take maximum pickups and drops. Then it picks up the clothes.
+A customer can view pickup time and payment status, they can view their delivery times as well. They can also make an order, live track the pickup and drop vehicle, view payment status, make payment online via e-sewa and they can even get receits of payments.
