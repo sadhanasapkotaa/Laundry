@@ -1,78 +1,65 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+"use client";
+
+import React, { createContext, useContext, ReactNode } from 'react';
+import { useAuth as useAuthQuery, useLogout } from '../queries/authQueries';
 
 export type UserRole = 'admin' | 'branch_manager' | 'accountant' | 'rider' | 'customer';
 
 export interface User {
   id: string;
-  name: string;
   email: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
   role: UserRole;
-  branchId?: string;
-  branchName?: string;
+  is_verified: boolean;
+  is_active: boolean;
+  date_joined: string;
+  last_login: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  isAuthenticated: boolean;
   isLoading: boolean;
+  error: any;
+  hasRole: (role: UserRole) => boolean;
+  hasAnyRole: (roles: UserRole[]) => boolean;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const mockUsers: User[] = [
-  { id: '1', name: 'Admin User', email: 'admin@laundry.com', role: 'admin' },
-  { id: '2', name: 'John Manager', email: 'manager@laundry.com', role: 'branch_manager', branchId: '1', branchName: 'Main Branch' },
-  { id: '3', name: 'Sarah Accountant', email: 'accountant@laundry.com', role: 'accountant' },
-  { id: '4', name: 'Mike Rider', email: 'rider@laundry.com', role: 'rider' },
-  { id: '5', name: 'Jane Customer', email: 'customer@laundry.com', role: 'customer' }
-];
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated, isLoading, error } = useAuthQuery();
+  const { mutate: logoutMutation } = useLogout();
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const hasRole = (role: UserRole): boolean => {
+    return user?.role === role;
+  };
 
-  useEffect(() => {
-    // Check for stored session
-    const storedUser = localStorage.getItem('laundry_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const foundUser = mockUsers.find(u => u.email === email);
-    if (foundUser && password === 'password') {
-      setUser(foundUser);
-      localStorage.setItem('laundry_user', JSON.stringify(foundUser));
-      setIsLoading(false);
-      return true;
-    }
-    
-    setIsLoading(false);
-    return false;
+  const hasAnyRole = (roles: UserRole[]): boolean => {
+    return user ? roles.includes(user.role) : false;
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('laundry_user');
+    logoutMutation();
   };
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+  const value: AuthContextType = {
+    user: user || null,
+    isAuthenticated,
+    isLoading,
+    error,
+    hasRole,
+    hasAnyRole,
+    logout,
+  };
 
-export const useAuth = () => {
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');

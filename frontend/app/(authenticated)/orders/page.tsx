@@ -1,0 +1,524 @@
+// OrderManagement.tsx
+"use client";
+
+import "../../types/i18n";
+import React, { JSX, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  FaSearch,
+  FaPlus,
+  FaEye,
+  FaEdit,
+  FaTruck,
+  FaBoxOpen,
+  FaClock,
+  FaCheckCircle,
+} from "react-icons/fa";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
+type OrderStatus = "received" | "in_progress" | "ready" | "delivered";
+
+interface Order {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  service: string;
+  items: string[];
+  status: OrderStatus;
+  amount: number;
+  receivedDate: string; // ISO or YYYY-MM-DD
+  deliveryDate?: string;
+  branchId: string;
+  branchName: string;
+  notes?: string;
+}
+
+const STATUS_META: Record<
+  OrderStatus,
+  { color: string; labelKey: string; Icon: React.ComponentType<any> }
+> = {
+  received: { color: "bg-blue-100 text-blue-800", labelKey: "orders.status.received", Icon: FaBoxOpen },
+  in_progress: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.status.in_progress", Icon: FaClock },
+  ready: { color: "bg-green-100 text-green-800", labelKey: "orders.status.ready", Icon: FaCheckCircle },
+  delivered: { color: "bg-gray-100 text-gray-800", labelKey: "orders.status.delivered", Icon: FaTruck },
+};
+
+export default function OrderManagement(): JSX.Element {
+  const { t } = useTranslation();
+
+  // UI state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  // form state for Add (lightweight)
+  const [form, setForm] = useState({
+    customerName: "",
+    customerPhone: "",
+    service: "Wash & Fold",
+    items: "",
+    amount: "",
+    branchId: "1",
+    branchName: "Main Branch",
+    notes: "",
+  });
+
+  // Mock data (keeps your sample)
+  const [orders, setOrders] = useState<Order[]>([
+    {
+      id: "ORD-001",
+      customerName: "Ram Sharma",
+      customerPhone: "+977-9841234567",
+      service: "Wash & Fold",
+      items: ["Shirts (5)", "Pants (3)", "Towels (2)"],
+      status: "received",
+      amount: 850,
+      receivedDate: "2025-01-06",
+      branchId: "1",
+      branchName: "Main Branch",
+      notes: "Handle with care - delicate fabric",
+    },
+    {
+      id: "ORD-002",
+      customerName: "Sita Rai",
+      customerPhone: "+977-9851234567",
+      service: "Dry Cleaning",
+      items: ["Suit (1)", "Dress (2)"],
+      status: "in_progress",
+      amount: 1200,
+      receivedDate: "2025-01-05",
+      branchId: "1",
+      branchName: "Main Branch",
+    },
+    {
+      id: "ORD-003",
+      customerName: "John Doe",
+      customerPhone: "+977-9861234567",
+      service: "Express Wash",
+      items: ["Shirts (8)", "Undergarments (10)"],
+      status: "ready",
+      amount: 950,
+      receivedDate: "2025-01-05",
+      deliveryDate: "2025-01-06",
+      branchId: "2",
+      branchName: "Downtown Branch",
+    },
+    {
+      id: "ORD-004",
+      customerName: "Maya Gurung",
+      customerPhone: "+977-9871234567",
+      service: "Iron Only",
+      items: ["Formal Wear (6)"],
+      status: "delivered",
+      amount: 450,
+      receivedDate: "2025-01-04",
+      deliveryDate: "2025-01-05",
+      branchId: "1",
+      branchName: "Main Branch",
+    },
+  ]);
+
+  // Derived data
+  const filteredOrders = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (statusFilter !== "all" && o.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        o.customerName.toLowerCase().includes(q) ||
+        o.id.toLowerCase().includes(q) ||
+        o.customerPhone.includes(q) ||
+        o.branchName.toLowerCase().includes(q)
+      );
+    });
+  }, [orders, searchTerm, statusFilter]);
+
+  const statusCounts = useMemo(() => {
+    const map: Record<OrderStatus, number> = {
+      received: 0,
+      in_progress: 0,
+      ready: 0,
+      delivered: 0,
+    };
+    orders.forEach((o) => (map[o.status] = (map[o.status] || 0) + 1));
+    return map;
+  }, [orders]);
+
+  // For charts: revenue by branch
+  const revenueByBranch = useMemo(() => {
+    const map = new Map<string, { branchName: string; revenue: number; orders: number }>();
+    orders.forEach((o) => {
+      const k = o.branchId;
+      if (!map.has(k)) map.set(k, { branchName: o.branchName, revenue: 0, orders: 0 });
+      const cur = map.get(k)!;
+      cur.revenue += o.amount;
+      cur.orders += 1;
+    });
+    return Array.from(map.entries()).map(([branchId, v]) => ({ branchId, name: v.branchName, revenue: v.revenue, orders: v.orders }));
+  }, [orders]);
+
+  // UI helpers
+  const openAdd = () => setIsAddOpen(true);
+  const closeAdd = () => {
+    setIsAddOpen(false);
+    setForm({ customerName: "", customerPhone: "", service: "Wash & Fold", items: "", amount: "", branchId: "1", branchName: "Main Branch", notes: "" });
+  };
+
+  const handleCreateOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    const nextId = `ORD-${String(orders.length + 1).padStart(3, "0")}`;
+    const newOrder: Order = {
+      id: nextId,
+      customerName: form.customerName || "Unnamed",
+      customerPhone: form.customerPhone || "",
+      service: form.service,
+      items: form.items ? form.items.split(",").map((s) => s.trim()) : [],
+      status: "received",
+      amount: Number(form.amount) || 0,
+      receivedDate: new Date().toISOString().split("T")[0],
+      branchId: form.branchId,
+      branchName: form.branchName,
+      notes: form.notes || undefined,
+    };
+    setOrders((prev) => [newOrder, ...prev]);
+    closeAdd();
+  };
+
+  const handleChangeStatus = (orderId: string, next: OrderStatus) => {
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: next } : o)));
+  };
+
+  // Small status badge
+  const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
+    const meta = STATUS_META[status];
+    const Icon = meta.Icon;
+    return (
+      <span className={`inline-flex items-center gap-2 px-2 py-1 text-xs rounded-full ${meta.color}`}>
+        <Icon className="w-3 h-3" />
+        <span>{t(meta.labelKey)}</span>
+      </span>
+    );
+  };
+
+  const pieData = useMemo(
+    () =>
+      (Object.keys(statusCounts) as OrderStatus[]).map((k) => ({
+        name: t(STATUS_META[k].labelKey),
+        value: statusCounts[k],
+        key: k,
+      })),
+    [statusCounts, t]
+  );
+
+  const COLORS = ["#3B82F6", "#F59E0B", "#10B981", "#6B7280"];
+
+  return (
+    <div className="space-y-6 p-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">{t("orders.title", "Orders")}</h1>
+          <p className="text-sm text-gray-600">{t("orders.subtitle", "Manage laundry orders, status and revenue")}</p>
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              aria-label={t("common.search", "Search")}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={t("common.searchPlaceholder", "Search orders, customers, branches...")}
+              className="w-full sm:w-80 pl-10 pr-3 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-white"
+            aria-label={t("orders.filterByStatus", "Filter by status")}
+          >
+            <option value="all">{t("orders.filter.all", "All Status")}</option>
+            <option value="received">{t("orders.status.received")}</option>
+            <option value="in_progress">{t("orders.status.in_progress")}</option>
+            <option value="ready">{t("orders.status.ready")}</option>
+            <option value="delivered">{t("orders.status.delivered")}</option>
+          </select>
+
+          <button
+            onClick={openAdd}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+            aria-label={t("orders.addNew", "Add New Order")}
+          >
+            <FaPlus />
+            <span className="hidden sm:inline">{t("orders.addNew", "Add New")}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Top charts & summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 p-4 border rounded-lg shadow-sm bg-white">
+          <h2 className="text-lg font-semibold mb-3">{t("orders.revenueByBranch", "Revenue by Branch")}</h2>
+          <div className="h-60">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={revenueByBranch}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="revenue" name={t("orders.chart.revenue", "Revenue (₨)")} fill="#8884d8" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="orders" name={t("orders.chart.orders", "Orders")} fill="#82ca9d" radius={[6, 6, 0, 0]} />
+                <Legend />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="p-4 border rounded-lg shadow-sm bg-white">
+          <h2 className="text-lg font-semibold mb-3">{t("orders.statusDistribution", "Status Distribution")}</h2>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={70} innerRadius={30} label>
+                  {pieData.map((entry, idx) => (
+                    <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Orders table */}
+      <div className="p-4 border rounded-lg shadow-sm bg-white">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">{t("orders.allOrders", "Orders")} ({filteredOrders.length})</h3>
+          <div className="text-sm text-gray-500">{t("orders.updated", "Live data")}</div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] table-auto border-collapse">
+            <thead className="text-left text-xs text-gray-600 uppercase">
+              <tr>
+                <th className="px-3 py-2">#{t("orders.id", "ID")}</th>
+                <th className="px-3 py-2">{t("orders.customer", "Customer")}</th>
+                <th className="px-3 py-2">{t("orders.service", "Service")}</th>
+                <th className="px-3 py-2">{t("orders.statusLabel", "Status")}</th>
+                <th className="px-3 py-2">{t("orders.amount", "Amount")}</th>
+                <th className="px-3 py-2">{t("orders.branch", "Branch")}</th>
+                <th className="px-3 py-2">{t("orders.date", "Date")}</th>
+                <th className="px-3 py-2">{t("common.actions", "Actions")}</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y">
+              {filteredOrders.map((order) => (
+                <tr key={order.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-3 align-top font-medium whitespace-nowrap">{order.id}</td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="text-sm font-medium">{order.customerName}</div>
+                    <div className="text-xs text-gray-500">{order.customerPhone}</div>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="text-sm">{order.service}</div>
+                    <div className="text-xs text-gray-500">{order.items.join(", ")}</div>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <StatusBadge status={order.status} />
+                  </td>
+                  <td className="px-3 py-3 align-top">₨ {order.amount.toLocaleString()}</td>
+                  <td className="px-3 py-3 align-top">{order.branchName}</td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="text-sm">{order.receivedDate}</div>
+                    {order.deliveryDate && <div className="text-xs text-gray-500">Delivered: {order.deliveryDate}</div>}
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="flex items-center gap-2">
+                      <button
+                        title={t("orders.view", "View")}
+                        className="p-2 rounded-md hover:bg-gray-100"
+                        onClick={() => alert(JSON.stringify(order, null, 2))}
+                      >
+                        <FaEye />
+                      </button>
+                      <button
+                        title={t("orders.edit", "Edit")}
+                        className="p-2 rounded-md hover:bg-gray-100"
+                        onClick={() => alert("Edit flow - implement your own")}
+                      >
+                        <FaEdit />
+                      </button>
+
+                      {/* quick status change menu (simple) */}
+                      <div className="relative inline-block">
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleChangeStatus(order.id, e.target.value as OrderStatus)}
+                          aria-label={t("orders.changeStatus", "Change status")}
+                          className="px-2 py-1 border rounded-md text-sm"
+                        >
+                          <option value="received">{t("orders.status.received")}</option>
+                          <option value="in_progress">{t("orders.status.in_progress")}</option>
+                          <option value="ready">{t("orders.status.ready")}</option>
+                          <option value="delivered">{t("orders.status.delivered")}</option>
+                        </select>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {filteredOrders.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center text-gray-500">
+                    {t("orders.empty", "No orders found")}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Status summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {(["received", "in_progress", "ready", "delivered"] as OrderStatus[]).map((k, idx) => (
+          <div key={k} className="p-4 border rounded-lg bg-white shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">{t(STATUS_META[k].labelKey)}</div>
+              <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+            </div>
+            <div className="mt-2 text-2xl font-semibold">{statusCounts[k] ?? 0}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add Order Modal (simple) */}
+      {isAddOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          <div className="absolute inset-0 bg-black/40" onClick={closeAdd} />
+          <form
+            onSubmit={handleCreateOrder}
+            className="relative z-10 w-full max-w-md bg-white rounded-lg shadow-lg p-4"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold">{t("orders.addNew", "Add New Order")}</h4>
+              <button type="button" onClick={closeAdd} aria-label={t("common.close", "Close")} className="text-gray-600">✕</button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-sm">
+                <div className="text-xs text-gray-600">{t("orders.customerName", "Customer Name")}</div>
+                <input
+                  value={form.customerName}
+                  onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 border rounded-md"
+                  required
+                />
+              </label>
+
+              <label className="block text-sm">
+                <div className="text-xs text-gray-600">{t("orders.customerPhone", "Phone")}</div>
+                <input
+                  value={form.customerPhone}
+                  onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 border rounded-md"
+                />
+              </label>
+
+              <label className="block text-sm">
+                <div className="text-xs text-gray-600">{t("orders.service", "Service")}</div>
+                <select
+                  value={form.service}
+                  onChange={(e) => setForm({ ...form, service: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 border rounded-md"
+                >
+                  <option>Wash & Fold</option>
+                  <option>Dry Cleaning</option>
+                  <option>Iron Only</option>
+                  <option>Express Wash</option>
+                </select>
+              </label>
+
+              <label className="block text-sm">
+                <div className="text-xs text-gray-600">{t("orders.items", "Items (comma separated)")}</div>
+                <input
+                  value={form.items}
+                  onChange={(e) => setForm({ ...form, items: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 border rounded-md"
+                />
+              </label>
+
+              <div className="flex gap-2">
+                <label className="flex-1 text-sm">
+                  <div className="text-xs text-gray-600">{t("orders.amount", "Amount (₨)")}</div>
+                  <input
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    type="number"
+                    className="mt-1 w-full px-3 py-2 border rounded-md"
+                  />
+                </label>
+
+                <label className="flex-1 text-sm">
+                  <div className="text-xs text-gray-600">{t("orders.branch", "Branch")}</div>
+                  <select
+                    value={form.branchId}
+                    onChange={(e) =>
+                      setForm({ ...form, branchId: e.target.value, branchName: e.target.selectedOptions[0].text })
+                    }
+                    className="mt-1 w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="1">Main Branch</option>
+                    <option value="2">Downtown Branch</option>
+                    <option value="3">Mall Branch</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="block text-sm">
+                <div className="text-xs text-gray-600">{t("orders.notes", "Notes (optional)")}</div>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 border rounded-md"
+                />
+              </label>
+
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={closeAdd} className="px-4 py-2 border rounded-md">
+                  {t("common.cancel", "Cancel")}
+                </button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md">
+                  {t("orders.create", "Create Order")}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+    </div>
+  );
+}

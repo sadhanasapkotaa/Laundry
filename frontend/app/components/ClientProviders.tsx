@@ -1,6 +1,7 @@
 "use client";
 
 import { AuthProvider } from "../contexts/AuthContext";
+import QueryProvider from "./QueryProvider";
 
 export default function ClientProviders({
   children,
@@ -8,8 +9,10 @@ export default function ClientProviders({
   children: React.ReactNode;
 }) {
   return (
-    <AuthProvider>
-      {children}
-    </AuthProvider>
+    <QueryProvider>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </QueryProvider>
   );
 }

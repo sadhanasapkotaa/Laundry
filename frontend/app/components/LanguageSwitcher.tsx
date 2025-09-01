@@ -1,4 +1,6 @@
+
 "use client";
+import "../types/i18n";
 
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -21,11 +23,17 @@ const languages: Language[] = [
   { code: "np", name: "Nepali", nativeName: "नेपाली" },
 ];
 
+
 export const LanguageSwitcher: React.FC = () => {
   const { i18n } = useTranslation();
 
   const changeLanguage = (languageCode: string) => {
-    i18n.changeLanguage(languageCode);
+    if (typeof i18n.changeLanguage === 'function') {
+      i18n.changeLanguage(languageCode);
+    } else {
+      // fallback: reload page with new language if needed
+      console.error('i18n.changeLanguage is not a function');
+    }
   };
 
   const currentLanguage = languages.find((lang) => lang.code === i18n.language) || languages[0];

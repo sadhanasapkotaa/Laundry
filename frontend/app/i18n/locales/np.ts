@@ -11,7 +11,8 @@ const np = {
   "navigation": {
     "dashboard": "ड्यासबोर्ड",
     "branches": "शाखा व्यवस्थापन",
-    "orders": "अर्डर व्यवस्थापन", 
+    "orders": "अर्डर व्यवस्थापन",
+    "placeOrders": "अर्डर राख्नुहोस्",
     "income": "आम्दानी ट्र्याकिंग",
     "expenses": "खर्च ट्र्याकिंग",
     "clients": "ग्राहक व्यवस्थापन",
@@ -105,7 +106,28 @@ const np = {
     "afternoon": "दिउँसो (१२ बजे - ५ बजे)", 
     "evening": "साँझ (५ बजे - ८ बजे)",
     "deliveryStatus": "डेलिभरी स्थिति",
-    "optimizeRoute": "मार्ग अनुकूलन गर्नुहोस्"
+    "optimizeRoute": "मार्ग अनुकूलन गर्नुहोस्",
+    "interactiveMap": "इन्टरएक्टिभ नक्सा",
+    "deliveryList": "डेलिभरी सूची",
+    "routeOptimization": "मार्ग अनुकूलन",
+    "mapView": "नक्सा दृश्य",
+    "mapPlaceholder": "नक्सा प्लेसहोल्डर",
+    "shortestDistance": "छोटो दूरी",
+    "fastestTime": "द्रुततम समय",
+    "priorityBased": "प्राथमिकता आधारित",
+    "pending": "बाँकी",
+    "inTransit": "ढुवानीमा",
+    "delivered": "डेलिभर भएको",
+    "priority": {
+      "high": "उच्च",
+      "medium": "मध्यम",
+      "low": "न्यून"
+    },
+    "status": {
+      "pending": "बाँकी",
+      "in_transit": "ढुवानीमा",
+      "delivered": "डेलिभर भएको"
+    }
   },
   "branches": {
     "title": "शाखा व्यवस्थापन",
@@ -236,7 +258,18 @@ const np = {
     "pendingPayments": "बाँकी भुक्तानीहरू",
     "completedPayments": "पूरा भएका भुक्तानीहरू",
     "paymentReminders": "भुक्तानी रिमाइन्डरहरू",
-    "sendReminder": "रिमाइन्डर पठाउनुहोस्"
+    "sendReminder": "रिमाइन्डर पठाउनुहोस्",
+    "markAllRead": "सबैलाई पढिएको चिन्ह लगाउनुहोस्",
+    "notifications": "सूचनाहरू",
+    "searchPlaceholder": "लेनदेन, आईडी, भुक्तानीकर्ता, वा शाखाहरू खोज्नुहोस्...",
+    "allTypes": "सबै प्रकार",
+    "received": "प्राप्त",
+    "made": "गरिएको",
+    "allStatus": "सबै स्थिति",
+    "completed": "पूरा भएको",
+    "pending": "बाँकी",
+    "failed": "असफल",
+    "noNotifications": "कुनै सूचना फेला परेन"
   },
   "roles": {
     "title": "भूमिका व्यवस्थापन",
