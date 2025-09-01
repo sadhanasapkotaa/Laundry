@@ -20,7 +20,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         """Meta class for User registration serializer."""
         model = User
-        fields = ['email', 'first_name', 'last_name', 'password', 'password2', 'role']
+        fields = ['email', 'first_name', 'last_name', 'phone', 'password', 'password2', 'role']
         # read_only_fields = ['role']  # Make role read-only
 
     def validate(self, attrs):
@@ -45,13 +45,15 @@ class UserLoginSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=255, min_length=3)
     password = serializers.CharField(max_length=68, min_length=6, write_only=True)
     full_name = serializers.CharField(max_length=255, read_only=True)
+    role = serializers.CharField(max_length=20, read_only=True)
+    phone = serializers.CharField(max_length=20, read_only=True)
     access_token = serializers.CharField(max_length=255, read_only=True)
     refresh_token = serializers.CharField(max_length=255, read_only=True)
 
     class Meta:
         """Meta class for User login serializer."""
         model = User
-        fields = ['email', 'password', 'full_name', 'access_token', 'refresh_token']
+        fields = ['email', 'password', 'full_name', 'role', 'phone', 'access_token', 'refresh_token']
 
     def validate(self, attrs):
         """Validate user credentials and return tokens."""
@@ -70,6 +72,8 @@ class UserLoginSerializer(serializers.ModelSerializer):
         return {
             'email': user.email,
             'full_name': user.get_full_name(),
+            'role': user.role,
+            'phone': user.phone,
             'access_token': str(user_tokens.get('access')),
             'refresh_token': str(user_tokens.get('refresh'))
         }
@@ -182,4 +186,23 @@ class LogoutUserSerializer(serializers.Serializer):
             return super().fail('bad_token')
 
 class VerifyUserEmailSerializer(serializers.Serializer):
-    otp_code = serializers.CharField(max_length=6)
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6)
+
+    def validate(self, attrs):
+        """Validate the OTP and email."""
+        return attrs
+
+class UpdateProfileSerializer(serializers.ModelSerializer):
+    """Serializer for updating user profile."""
+    
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email', 'phone']
+        
+    def validate_email(self, value):
+        """Ensure email remains unique when updating."""
+        user = self.instance
+        if user and User.objects.filter(email=value).exclude(id=user.id).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value

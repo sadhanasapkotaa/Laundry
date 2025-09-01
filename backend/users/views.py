@@ -10,7 +10,7 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from .serializers import (UserRegisterSerializer, UserLoginSerializer,
                         PasswordResetSerializer, SetNewPasswordSerializer,
                         PasswordResetConfirmSerializer, LogoutUserSerializer,
-                        VerifyUserEmailSerializer)
+                        VerifyUserEmailSerializer, UpdateProfileSerializer)
 from .models import User, OneTimePassword
 from .utils import send_code_to_user
 from .utils import generate_otp
@@ -60,7 +60,7 @@ class VerifyUserEmail(GenericAPIView):
         """Handle email verification request with OTP."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        otp_code = serializer.validated_data['otp_code']
+        otp_code = serializer.validated_data['otp']  # Changed from otp_code to otp
 
 
         try:
@@ -133,10 +133,20 @@ class TestAuthenticationView(GenericAPIView):
             request: HTTP request object
             
         Returns:
-            Response with success message
+            Response with user data
         """
+        user = request.user
         data = {
-            'msg': 'Authenticated',
+            'id': str(user.id),
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'phone': user.phone,
+            'role': user.role,
+            'is_verified': user.is_verified,
+            'is_active': user.is_active,
+            'date_joined': user.date_joined.isoformat(),
+            'last_login': user.last_login.isoformat() if user.last_login else None,
         }
         return Response(data, status=status.HTTP_200_OK)
     
@@ -272,6 +282,61 @@ class LogoutUserView(GenericAPIView):
                 {
                     'success': False,
                     'message': 'Logout failed',
+                    'error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST
+            )
+
+class UpdateProfileView(GenericAPIView):
+    """
+    View for updating user profile.
+    Requires authentication.
+    """
+    serializer_class = UpdateProfileSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    
+    def patch(self, request):
+        """
+        Handle profile update request.
+        
+        Args:
+            request: HTTP request object containing updated profile data
+            
+        Returns:
+            Response with updated user data or error details
+        """
+        try:
+            user = request.user
+            serializer = self.serializer_class(user, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            
+            # Return updated user data
+            updated_data = {
+                'id': str(user.id),
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'phone': user.phone,
+                'role': user.role,
+                'is_verified': user.is_verified,
+                'is_active': user.is_active,
+                'date_joined': user.date_joined.isoformat(),
+                'last_login': user.last_login.isoformat() if user.last_login else None,
+            }
+            
+            return Response(
+                {
+                    'success': True,
+                    'message': 'Profile updated successfully',
+                    'data': updated_data
+                }, status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {
+                    'success': False,
+                    'message': 'Profile update failed',
                     'error': str(e)
                 }, status=status.HTTP_400_BAD_REQUEST
             )

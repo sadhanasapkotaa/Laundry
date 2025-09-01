@@ -11,6 +11,7 @@ class Role(models.TextChoices):
     BRANCH_MANAGER = 'branch_manager', 'Branch Manager'
     RIDER = 'rider', 'Rider'
     CUSTOMER = 'customer', 'Customer'
+    ACCOUNTANT = 'accountant', 'Accountant'
 
 class User(AbstractUser, PermissionsMixin):
     """Custom User model that extends AbstractUser and PermissionsMixin."""
@@ -18,6 +19,7 @@ class User(AbstractUser, PermissionsMixin):
     email = models.EmailField(max_length=255, unique=True, verbose_name=_('Email Address'))
     first_name = models.CharField(max_length=100, verbose_name=_('First Name'))
     last_name = models.CharField(max_length=100, verbose_name=_('Last Name'))
+    phone = models.CharField(max_length=20, verbose_name=_('Phone Number'))
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
@@ -33,7 +35,7 @@ class User(AbstractUser, PermissionsMixin):
 
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
+    REQUIRED_FIELDS = ['first_name', 'last_name', 'phone']
 
     objects = UserManager()
 

@@ -31,7 +31,7 @@ SECRET_KEY = 'django-insecure-zm*3-&2c$8r@!t0*li4=yt@eb@y^9pw_ec#4@u=3hx&eh3#!!-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.16.1']
 
 
 # Application definition
@@ -141,11 +141,12 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
-    "https://example.com",
-    "https://sub.example.com",
-    "http://localhost:8080",
-    "http://127.0.0.1:9000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://192.168.16.1:3000",  # Added this for your network access
 ]
+
+CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = (
     "DELETE",
@@ -165,13 +166,10 @@ CORS_ALLOW_HEADERS = (
     "x-requested-with",
 )
 
-CORS_ALLOWED_ORIGINS = [
-    "https://read-only.example.com",
-    "https://read-and-write.example.com",
-]
-
 CSRF_TRUSTED_ORIGINS = [
-    "https://read-and-write.example.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://192.168.16.1:3000",
 ]
 
 
@@ -250,11 +248,3 @@ ESEWA_STATUS_CHECK_URL = 'https://rc.esewa.com.np/api/epay/transaction/status/'
 
 # Frontend URL for success/failure redirects
 FRONTEND_URL = 'http://localhost:3000'  # Change to your Next.js app URL
-
-# CORS Settings (if using django-cors-headers)
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
-CORS_ALLOW_CREDENTIALS = True
