@@ -79,7 +79,7 @@ const EditBranch = () => {
     }
   };
 
-  const handleAddressSelect = (address: string, coordinates: { lat: number; lng: number }, mapLink: string) => {
+  const handleAddressSelect = (address: string, mapLink: string) => {
     setFormData((prev) => ({
       ...prev,
       address,
