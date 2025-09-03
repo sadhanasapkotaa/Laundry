@@ -13,6 +13,7 @@ import {
   FaBoxOpen,
   FaClock,
   FaCheckCircle,
+  FaSpinner,
 } from "react-icons/fa";
 import {
   ResponsiveContainer,
@@ -27,6 +28,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import PaymentService from "../../services/paymentService";
 
 type OrderStatus = "received" | "in_progress" | "ready" | "delivered";
 
@@ -62,8 +64,8 @@ export default function OrderManagement(): JSX.Element {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // form state for Add (lightweight)
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -73,6 +75,7 @@ export default function OrderManagement(): JSX.Element {
     branchId: "1",
     branchName: "Main Branch",
     notes: "",
+    paymentMethod: "cash", // Add payment method to form
   });
 
   // Mock data (keeps your sample)
@@ -173,27 +176,119 @@ export default function OrderManagement(): JSX.Element {
   const openAdd = () => setIsAddOpen(true);
   const closeAdd = () => {
     setIsAddOpen(false);
-    setForm({ customerName: "", customerPhone: "", service: "Wash & Fold", items: "", amount: "", branchId: "1", branchName: "Main Branch", notes: "" });
+    setForm({ 
+      customerName: "", 
+      customerPhone: "", 
+      service: "Wash & Fold", 
+      items: "", 
+      amount: "", 
+      branchId: "1", 
+      branchName: "Main Branch", 
+      notes: "",
+      paymentMethod: "cash"
+    });
   };
 
-  const handleCreateOrder = (e: React.FormEvent) => {
+  const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    const nextId = `ORD-${String(orders.length + 1).padStart(3, "0")}`;
-    const newOrder: Order = {
-      id: nextId,
-      customerName: form.customerName || "Unnamed",
-      customerPhone: form.customerPhone || "",
-      service: form.service,
-      items: form.items ? form.items.split(",").map((s) => s.trim()) : [],
-      status: "received",
-      amount: Number(form.amount) || 0,
-      receivedDate: new Date().toISOString().split("T")[0],
-      branchId: form.branchId,
-      branchName: form.branchName,
-      notes: form.notes || undefined,
-    };
-    setOrders((prev) => [newOrder, ...prev]);
-    closeAdd();
+    
+    // Validate required fields
+    if (!form.customerName.trim()) {
+      alert('Please enter customer name');
+      return;
+    }
+    
+    const orderAmount = Number(form.amount) || 0;
+    if (orderAmount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+
+    try {
+      // Create order locally first (in a real app, this would be an API call)
+      const nextId = `ORD-${String(orders.length + 1).padStart(3, "0")}`;
+      const newOrder: Order = {
+        id: nextId,
+        customerName: form.customerName || "Unnamed",
+        customerPhone: form.customerPhone || "",
+        service: form.service,
+        items: form.items ? form.items.split(",").map((s) => s.trim()) : [],
+        status: "received",
+        amount: orderAmount,
+        receivedDate: new Date().toISOString().split("T")[0],
+        branchId: form.branchId,
+        branchName: form.branchName,
+        notes: form.notes || undefined,
+      };
+
+      // Handle payment based on method
+      if (form.paymentMethod === 'esewa') {
+        // Initiate eSewa payment
+        const paymentResponse = await PaymentService.initiatePayment({
+          payment_type: 'esewa',
+          amount: orderAmount,
+          order_id: nextId,
+        });
+
+        if (paymentResponse.success && paymentResponse.payment_data && paymentResponse.esewa_url) {
+          // Add order to list
+          setOrders((prev) => [newOrder, ...prev]);
+          
+          // Show success message and redirect to eSewa
+          alert(`Order ${nextId} created successfully! Redirecting to eSewa for payment of Rs. ${orderAmount}...`);
+          
+          // Submit to eSewa
+          PaymentService.submitEsewaPayment(paymentResponse.payment_data, paymentResponse.esewa_url);
+          
+          closeAdd();
+        } else {
+          alert(`Failed to initiate eSewa payment: ${paymentResponse.error || 'Unknown error'}`);
+        }
+      } else if (form.paymentMethod === 'bank') {
+        // Initiate bank payment
+        const paymentResponse = await PaymentService.initiatePayment({
+          payment_type: 'bank',
+          amount: orderAmount,
+          order_id: nextId,
+        });
+
+        if (paymentResponse.success && paymentResponse.bank_details) {
+          // Add order to list
+          setOrders((prev) => [newOrder, ...prev]);
+          
+          // Show bank details
+          const bankDetails = paymentResponse.bank_details;
+          alert(`Order ${nextId} created successfully!\n\nBank Transfer Details:\nAccount Name: ${bankDetails.account_name}\nAccount Number: ${bankDetails.account_number}\nBank: ${bankDetails.bank_name}\nSWIFT: ${bankDetails.swift_code}\n\nPlease transfer Rs. ${orderAmount} and keep the receipt.`);
+          
+          closeAdd();
+        } else {
+          alert(`Failed to create bank payment: ${paymentResponse.error || 'Unknown error'}`);
+        }
+      } else {
+        // Cash on delivery - create payment record
+        const paymentResponse = await PaymentService.initiatePayment({
+          payment_type: 'cash',
+          amount: orderAmount,
+          order_id: nextId,
+        });
+
+        if (paymentResponse.success) {
+          // Add order to list
+          setOrders((prev) => [newOrder, ...prev]);
+          alert(`Order ${nextId} created successfully! Payment will be collected on delivery (Rs. ${orderAmount}).`);
+          closeAdd();
+        } else {
+          alert(`Failed to create order: ${paymentResponse.error || 'Unknown error'}`);
+        }
+      }
+    } catch (error) {
+      console.error('Order creation error:', error);
+      alert('Failed to create order. Please try again.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   const handleChangeStatus = (orderId: string, next: OrderStatus) => {
@@ -477,7 +572,9 @@ export default function OrderManagement(): JSX.Element {
                     value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value })}
                     type="number"
+                    min="1"
                     className="mt-1 w-full px-3 py-2 border rounded-md"
+                    required
                   />
                 </label>
 
@@ -506,12 +603,53 @@ export default function OrderManagement(): JSX.Element {
                 />
               </label>
 
+              <label className="block text-sm">
+                <div className="text-xs text-gray-600">Payment Method</div>
+                <select
+                  value={form.paymentMethod}
+                  onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="cash">💵 Cash on Delivery</option>
+                  <option value="bank">🏦 Bank Transfer</option>
+                  <option value="esewa">📱 eSewa (Online Payment)</option>
+                </select>
+              </label>
+
+              {form.paymentMethod !== 'cash' && (
+                <div className={`p-3 rounded-md ${
+                  form.paymentMethod === 'esewa' ? 'bg-green-50' : 'bg-blue-50'
+                }`}>
+                  <p className={`text-sm ${
+                    form.paymentMethod === 'esewa' ? 'text-green-800' : 'text-blue-800'
+                  }`}>
+                    {form.paymentMethod === 'esewa' 
+                      ? '🚀 You will be redirected to eSewa for secure online payment after creating the order.'
+                      : '🏛️ Bank transfer details will be provided after creating the order. Please transfer the amount and keep the receipt.'
+                    }
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-2 justify-end">
-                <button type="button" onClick={closeAdd} className="px-4 py-2 border rounded-md">
+                <button 
+                  type="button" 
+                  onClick={closeAdd} 
+                  className="px-4 py-2 border rounded-md"
+                  disabled={isProcessingPayment}
+                >
                   {t("common.cancel", "Cancel")}
                 </button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md">
-                  {t("orders.create", "Create Order")}
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 disabled:opacity-50"
+                  disabled={isProcessingPayment}
+                >
+                  {isProcessingPayment && <FaSpinner className="animate-spin" />}
+                  {isProcessingPayment 
+                    ? (form.paymentMethod === 'esewa' ? 'Processing Payment...' : 'Creating Order...') 
+                    : t("orders.create", "Create Order")
+                  }
                 </button>
               </div>
             </div>

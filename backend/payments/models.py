@@ -21,7 +21,8 @@ class Payment(models.Model):
     ]
     PAYMENT_TYPE_CHOICES = [
         ('cash', 'Cash'),
-        ('card', 'Card'),
+        ('bank', 'Bank'),
+        ('esewa', 'Esewa'),
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

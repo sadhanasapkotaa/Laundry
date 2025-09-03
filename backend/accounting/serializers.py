@@ -1,10 +1,31 @@
 """This file contains serializers for the accounting application, including income and expense models,"""
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Income, Expense
+from .models import Income, Expense, IncomeCategory, ExpenseCategory
+
+
+class IncomeCategorySerializer(serializers.ModelSerializer):
+    """Serializer for IncomeCategory model."""
+    class Meta:
+        """Meta class for IncomeCategory serializer."""
+        model = IncomeCategory
+        fields = '__all__'
+
+
+class ExpenseCategorySerializer(serializers.ModelSerializer):
+    """Serializer for ExpenseCategory model."""
+    class Meta:
+        """Meta class for ExpenseCategory serializer."""
+        model = ExpenseCategory
+        fields = '__all__'
+
 
 class IncomeSerializer(serializers.ModelSerializer):
     """Serializer for Income model."""
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    branch_id_display = serializers.CharField(source='branch.branch_id', read_only=True)
+    
     class Meta:
         """Meta class for Income serializer."""
         model = Income
@@ -13,6 +34,10 @@ class IncomeSerializer(serializers.ModelSerializer):
 
 class ExpenseSerializer(serializers.ModelSerializer):
     """Serializer for Expense model."""
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    branch_id_display = serializers.CharField(source='branch.branch_id', read_only=True)
+    
     class Meta:
         """Meta class for Expense serializer."""
         model = Expense

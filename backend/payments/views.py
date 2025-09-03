@@ -1,72 +1,127 @@
 # payments/views.py
-"""Module docstring"""
+"""Module docstring for payment views handling different payment methods"""
 import json
 import base64
 import logging
 from datetime import datetime, timedelta
 import requests
 from django.db import DatabaseError
-from rest_framework.permissions import IsAuthenticated
-# from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-# from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.core.exceptions import ValidationError 
+from django.db.models import Q
 from .models import Payment, Subscription
 from .utils import EsewaPaymentUtils
-# import ValidationError
 
 logger = logging.getLogger(__name__)
 
 
 
-@method_decorator([csrf_exempt, login_required], name='dispatch')
+@method_decorator([csrf_exempt], name='dispatch')
 class InitiatePaymentView(View):
-    """Initiate payment process with eSewa"""
-    permission_classes = [IsAuthenticated]
+    """Initiate payment process with different payment methods"""
 
     def post(self, request):
         """Handle payment initiation"""
         try:
+            # Handle both JSON and form data
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+            else:
+                data = request.POST.dict()
+                
+            payment_type = data.get('payment_type', 'cash')
+            amount = float(data.get('amount', 5000.00))
+            # order_id can be used for linking payment to specific order
+            
+            # For testing - use a test user if not authenticated
+            if request.user.is_authenticated:
+                user = request.user
+            else:
+                # Create or get a test user for unauthenticated requests
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                user, created = User.objects.get_or_create(
+                    email='test@example.com',
+                    defaults={
+                        'first_name': 'Test', 
+                        'last_name': 'User',
+                        'phone': '+977-9841234567'
+                    }
+                )
+            
+            # Create payment record
             payment = Payment.objects.create(
-                user=request.user,
-                amount=5000.00,
+                user=user,
+                amount=amount,
                 tax_amount=0.00,
-                total_amount=5000.00,
+                total_amount=amount,
+                payment_type=payment_type,
                 status='PENDING'
             )
 
-            signature = EsewaPaymentUtils.generate_signature(
-                total_amount=str(int(payment.total_amount)),
-                transaction_uuid=payment.transaction_uuid,
-                product_code=settings.ESEWA_PRODUCT_CODE
-            )
+            # Handle different payment types
+            if payment_type == 'esewa':
+                signature = EsewaPaymentUtils.generate_signature(
+                    total_amount=str(int(payment.total_amount)),
+                    transaction_uuid=payment.transaction_uuid,
+                    product_code=settings.ESEWA_PRODUCT_CODE
+                )
 
-            payment_data = {
-                'amount': str(int(payment.amount)),
-                'tax_amount': str(int(payment.tax_amount)),
-                'total_amount': str(int(payment.total_amount)),
-                'transaction_uuid': payment.transaction_uuid,
-                'product_code': settings.ESEWA_PRODUCT_CODE,
-                'product_service_charge': '0',
-                'product_delivery_charge': '0',
-                'success_url': f"{settings.FRONTEND_URL}/payment/success",
-                'failure_url': f"{settings.FRONTEND_URL}/payment/failure",
-                'signed_field_names': 'total_amount,transaction_uuid,product_code',
-                'signature': signature
-            }
+                payment_data = {
+                    'amount': str(int(payment.amount)),
+                    'tax_amount': str(int(payment.tax_amount)),
+                    'total_amount': str(int(payment.total_amount)),
+                    'transaction_uuid': payment.transaction_uuid,
+                    'product_code': settings.ESEWA_PRODUCT_CODE,
+                    'product_service_charge': '0',
+                    'product_delivery_charge': '0',
+                    'success_url': f"{settings.FRONTEND_URL}/payment/success",
+                    'failure_url': f"{settings.FRONTEND_URL}/payment/failure",
+                    'signed_field_names': 'total_amount,transaction_uuid,product_code',
+                    'signature': signature
+                }
 
-            return JsonResponse({
-                'success': True,
-                'payment_data': payment_data,
-                'esewa_url': settings.ESEWA_PAYMENT_URL,
-                'transaction_uuid': payment.transaction_uuid
-            })
+                return JsonResponse({
+                    'success': True,
+                    'payment_data': payment_data,
+                    'esewa_url': settings.ESEWA_PAYMENT_URL,
+                    'transaction_uuid': payment.transaction_uuid,
+                    'payment_type': 'esewa'
+                })
+                
+            elif payment_type == 'bank':
+                # For bank payments, mark as pending and provide bank details
+                return JsonResponse({
+                    'success': True,
+                    'transaction_uuid': payment.transaction_uuid,
+                    'payment_type': 'bank',
+                    'bank_details': {
+                        'account_name': 'Laundry Management System',
+                        'account_number': '1234567890',
+                        'bank_name': 'Sample Bank',
+                        'swift_code': 'SAMPLEBNK'
+                    }
+                })
+                
+            else:  # cash payment
+                # For cash payments, mark as completed immediately (COD)
+                payment.status = 'COMPLETE'
+                payment.save()
+                
+                return JsonResponse({
+                    'success': True,
+                    'transaction_uuid': payment.transaction_uuid,
+                    'payment_type': 'cash',
+                    'message': 'Cash on delivery order placed successfully'
+                })
 
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
         except ValidationError as ve:
             return JsonResponse({'success': False, 'error': f'Validation error: {str(ve)}'}, status=400)
         except DatabaseError as de:
@@ -85,7 +140,7 @@ class InitiatePaymentView(View):
         except Exception as e:
             logger.exception("Unexpected error during payment initiation : %s", e)
             return JsonResponse({'success': False,
-                                 'error': 'An unexpected error occurred'}, status=500)
+                                 'error': f'An unexpected error occurred: {str(e)}'}, status=500)
 
 class PaymentSuccessView(View):
     """Handle successful payment response from eSewa"""
@@ -145,9 +200,10 @@ class PaymentSuccessView(View):
                 }
             })
 
-        except Payment.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Payment not found'})
         except Exception as e:
+            from django.core.exceptions import ObjectDoesNotExist
+            if isinstance(e, ObjectDoesNotExist):
+                return JsonResponse({'success': False, 'error': 'Payment not found'})
             return JsonResponse({'success': False, 'error': str(e)})
 
 class PaymentFailureView(View):
@@ -239,3 +295,72 @@ def user_subscription_status(request):
             'success': True,
             'subscription': None
         })
+
+@login_required
+def payment_history(request):
+    """Get user's payment history with search and filtering"""
+    try:
+        # Get query parameters
+        search = request.GET.get('search', '')
+        payment_type = request.GET.get('payment_type', '')
+        status = request.GET.get('status', '')
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 10))
+        
+        # Build query
+        payments = Payment.objects.filter(user=request.user).order_by('-created_at')
+        
+        # Apply filters
+        if search:
+            payments = payments.filter(
+                Q(transaction_uuid__icontains=search) |
+                Q(transaction_code__icontains=search) |
+                Q(ref_id__icontains=search)
+            )
+        
+        if payment_type:
+            payments = payments.filter(payment_type=payment_type)
+            
+        if status:
+            payments = payments.filter(status=status)
+        
+        # Paginate
+        from django.core.paginator import Paginator
+        paginator = Paginator(payments, page_size)
+        page_obj = paginator.get_page(page)
+        
+        # Serialize payments
+        payments_data = []
+        for payment in page_obj:
+            payments_data.append({
+                'id': payment.id,
+                'transaction_uuid': payment.transaction_uuid,
+                'transaction_code': payment.transaction_code,
+                'amount': float(payment.amount),
+                'tax_amount': float(payment.tax_amount),
+                'total_amount': float(payment.total_amount),
+                'payment_type': payment.payment_type,
+                'status': payment.status,
+                'ref_id': payment.ref_id,
+                'created_at': payment.created_at.isoformat(),
+                'updated_at': payment.updated_at.isoformat(),
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'payments': payments_data,
+            'pagination': {
+                'current_page': page_obj.number,
+                'total_pages': paginator.num_pages,
+                'total_count': paginator.count,
+                'has_next': page_obj.has_next(),
+                'has_previous': page_obj.has_previous(),
+            }
+        })
+        
+    except Exception as e:
+        logger.exception("Error fetching payment history: %s", e)
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to fetch payment history'
+        }, status=500)

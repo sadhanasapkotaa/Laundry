@@ -12,13 +12,16 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Income, Expense
+from .models import Income, Expense, IncomeCategory, ExpenseCategory
+from branches.models import Branch
 from .serializers import (
     TimePeriodReportSerializer,
     BranchInsightsSerializer,
     FullAccountingSerializer,
     IncomeSerializer,
-    ExpenseSerializer
+    ExpenseSerializer,
+    IncomeCategorySerializer,
+    ExpenseCategorySerializer
 )
 
 class IncomeViewSet(viewsets.ModelViewSet):
@@ -28,7 +31,7 @@ class IncomeViewSet(viewsets.ModelViewSet):
     queryset = Income.objects.all().order_by('-date_received')
     serializer_class = IncomeSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['branch', 'date_received']
+    filterset_fields = ['branch', 'date_received', 'category']
 
     @action(detail=False, methods=['get'])
     def by_time(self, request):
@@ -62,7 +65,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     queryset = Expense.objects.all().order_by('-date_incurred')
     serializer_class = ExpenseSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['branch', 'date_incurred']
+    filterset_fields = ['branch', 'date_incurred', 'category']
 
     @action(detail=False, methods=['get'])
     def by_time(self, request):
@@ -84,6 +87,36 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
         data = qs.values('period').annotate(total=Sum('amount')).order_by('-period')
         return Response(data)
+
+
+class IncomeCategoryViewSet(viewsets.ModelViewSet):
+    """ViewSet for handling income categories."""
+    queryset = IncomeCategory.objects.all().order_by('name')
+    serializer_class = IncomeCategorySerializer
+
+
+class ExpenseCategoryViewSet(viewsets.ModelViewSet):
+    """ViewSet for handling expense categories."""
+    queryset = ExpenseCategory.objects.all().order_by('name')
+    serializer_class = ExpenseCategorySerializer
+
+
+class AccountingDataView(APIView):
+    """View for fetching dropdown data (branches and categories)."""
+    
+    def get(self, request):
+        """Get all branches and categories for dropdowns."""
+        from branches.serializers import BranchSerializer
+        
+        branches = Branch.objects.filter(status='active').order_by('name')
+        income_categories = IncomeCategory.objects.all().order_by('name')
+        expense_categories = ExpenseCategory.objects.all().order_by('name')
+        
+        return Response({
+            'branches': BranchSerializer(branches, many=True).data,
+            'income_categories': IncomeCategorySerializer(income_categories, many=True).data,
+            'expense_categories': ExpenseCategorySerializer(expense_categories, many=True).data,
+        }, status=status.HTTP_200_OK)
 
 
 class TimePeriodReportView(APIView):

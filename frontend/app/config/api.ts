@@ -53,6 +53,15 @@ export const API_CONFIG = {
         DELETE: (id: string | number) => `/account/expense/${id}/delete/`,
       },
     },
+    // Payments
+    PAYMENTS: {
+      INITIATE: '/payments/initiate/',
+      SUCCESS: '/payments/success/',
+      FAILURE: '/payments/failure/',
+      STATUS: (uuid: string) => `/payments/status/${uuid}/`,
+      HISTORY: '/payments/history/',
+      SUBSCRIPTION_STATUS: '/payments/subscription/status/',
+    },
   },
 };
 
