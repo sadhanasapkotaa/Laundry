@@ -8,11 +8,11 @@ from .views import (
 
 urlpatterns = [
     # Order endpoints
-    path('orders/', OrderListView.as_view(), name='order-list'),
-    path('orders/create/', OrderCreateView.as_view(), name='order-create'),
-    path('orders/<int:pk>/', OrderDetailView.as_view(), name='order-detail'),
-    path('orders/<int:pk>/update/', OrderUpdateView.as_view(), name='order-update'),
-    path('orders/<int:pk>/delete/', OrderDeleteView.as_view(), name='order-delete'),
+    path('', OrderListView.as_view(), name='order-list'),
+    path('create/', OrderCreateView.as_view(), name='order-create'),
+    path('<uuid:pk>/', OrderDetailView.as_view(), name='order-detail'),
+    path('<uuid:pk>/update/', OrderUpdateView.as_view(), name='order-update'),
+    path('<uuid:pk>/delete/', OrderDeleteView.as_view(), name='order-delete'),
 
     # Delivery endpoints
     path('deliveries/', DeliveryListView.as_view(), name='delivery-list'),

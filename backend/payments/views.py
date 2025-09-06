@@ -1,7 +1,6 @@
 # payments/views.py
 """Module docstring for payment views handling different payment methods"""
 import json
-import base64
 import logging
 from datetime import datetime, timedelta
 import requests
@@ -80,8 +79,8 @@ class InitiatePaymentView(View):
                     'product_code': settings.ESEWA_PRODUCT_CODE,
                     'product_service_charge': '0',
                     'product_delivery_charge': '0',
-                    'success_url': f"{settings.FRONTEND_URL}/payment/success",
-                    'failure_url': f"{settings.FRONTEND_URL}/payment/failure",
+                    'success_url': f"{settings.BACKEND_URL}/payment/success/",
+                    'failure_url': f"{settings.FRONTEND_URL}/place-orders/failure",
                     'signed_field_names': 'total_amount,transaction_uuid,product_code',
                     'signature': signature
                 }
@@ -147,32 +146,31 @@ class PaymentSuccessView(View):
     def get(self, request):
         """Process successful payment"""
         try:
-            # Get the encoded data from query parameters
-            data_param = request.GET.get('data')
-            if not data_param:
-                return JsonResponse({'success': False, 'error': 'No payment data received'})
+            # Get eSewa parameters from query string
+            oid = request.GET.get('oid')  # transaction_uuid
+            amt = request.GET.get('amt')  # amount
+            refId = request.GET.get('refId')  # eSewa reference ID
+            
+            if not all([oid, amt, refId]):
+                # Redirect to failure page if missing parameters
+                from django.shortcuts import redirect
+                return redirect(f"{settings.FRONTEND_URL}/place-orders/failure?reason=Missing payment parameters")
 
-            # Decode the base64 data
-            decoded_data = base64.b64decode(data_param).decode('utf-8')
-            payment_response = json.loads(decoded_data)
-
-            # Verify signature
-            signature = payment_response.get('signature')
-            if not EsewaPaymentUtils.verify_signature(payment_response, signature):
-                return JsonResponse({'success': False, 'error': 'Invalid signature'})
-
-            # Find and update payment
-            transaction_uuid = payment_response.get('transaction_uuid')
-            #pylint: disable=no-member
-            payment = Payment.objects.get(transaction_uuid=transaction_uuid)
-
-            payment.status = payment_response.get('status', 'COMPLETE')
-            payment.transaction_code = payment_response.get('transaction_code')
-            payment.save()
-
-            # Create or update subscription if payment is complete
-            if payment.status == 'COMPLETE':
-                # pylint: disable=no-member
+            try:
+                # Find the payment record
+                payment = Payment.objects.get(transaction_uuid=oid)
+                
+                # Verify the amount matches
+                if float(amt) != float(payment.total_amount):
+                    from django.shortcuts import redirect
+                    return redirect(f"{settings.FRONTEND_URL}/place-orders/failure?reason=Payment amount mismatch")
+                
+                # Update payment status
+                payment.status = 'COMPLETE'
+                payment.ref_id = refId
+                payment.save()
+                
+                # Create or update subscription if payment is complete
                 subscription, created = Subscription.objects.get_or_create(
                     user=payment.user,
                     defaults={
@@ -190,21 +188,150 @@ class PaymentSuccessView(View):
                     subscription.end_date = datetime.now() + timedelta(days=365)
                     subscription.save()
 
-            return JsonResponse({
+                # Redirect to frontend confirmation page with payment details
+                from django.shortcuts import redirect
+                confirmation_url = f"{settings.FRONTEND_URL}/place-orders/confirmation?orderId={oid}&paymentRef={refId}&amount={amt}&paymentMethod=esewa"
+                return redirect(confirmation_url)
+                
+            except Payment.DoesNotExist:
+                from django.shortcuts import redirect
+                return redirect(f"{settings.FRONTEND_URL}/place-orders/failure?reason=Payment record not found")
+
+        except Exception as e:
+            logger.exception("Error processing eSewa payment success: %s", e)
+            from django.shortcuts import redirect
+            return redirect(f"{settings.FRONTEND_URL}/place-orders/failure?reason=Payment processing failed")
+
+
+@method_decorator([csrf_exempt], name='dispatch')
+class VerifyEsewaPaymentView(View):
+    """Verify eSewa payment from frontend"""
+    def post(self, request):
+        """Verify and process eSewa payment parameters"""
+        try:
+            data = json.loads(request.body)
+            
+            # Get eSewa parameters
+            oid = data.get('oid')  # transaction_uuid
+            amt = data.get('amt')  # amount
+            refId = data.get('refId')  # eSewa reference ID
+            order_data = data.get('orderData')  # Order data for automatic order creation
+            
+            if not all([oid, amt, refId]):
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Missing required eSewa parameters'
+                })
+            
+            # Find the payment record
+            payment = Payment.objects.get(transaction_uuid=oid)
+            
+            # Verify the amount matches
+            if float(amt) != float(payment.total_amount):
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Payment amount mismatch'
+                })
+            
+            # Update payment status
+            payment.status = 'COMPLETE'
+            payment.ref_id = refId
+            payment.save()
+            
+            # Create or update subscription if payment is complete
+            subscription, created = Subscription.objects.get_or_create(
+                user=payment.user,
+                defaults={
+                    'payment': payment,
+                    'is_active': True,
+                    'start_date': datetime.now(),
+                    'end_date': datetime.now() + timedelta(days=365)
+                }
+            )
+
+            if not created:
+                subscription.payment = payment
+                subscription.is_active = True
+                subscription.start_date = datetime.now()
+                subscription.end_date = datetime.now() + timedelta(days=365)
+                subscription.save()
+            
+            response_data = {
                 'success': True,
                 'payment': {
                     'transaction_uuid': payment.transaction_uuid,
-                    'transaction_code': payment.transaction_code,
+                    'ref_id': payment.ref_id,
                     'status': payment.status,
                     'amount': float(payment.total_amount)
                 }
+            }
+            
+            # If order data is provided, automatically create the order
+            if order_data:
+                try:
+                    from orders.serializers import OrderCreateSerializer
+                    
+                    # Prepare order data for creation
+                    order_create_data = {
+                        'user': payment.user.id,
+                        'branch': order_data.get('branch'),
+                        'services': order_data.get('cart', []),
+                        'pickup_enabled': order_data.get('services', {}).get('pickupEnabled', False),
+                        'delivery_enabled': order_data.get('services', {}).get('deliveryEnabled', False),
+                        'pickup_date': order_data.get('pickup', {}).get('date') if order_data.get('pickup') else None,
+                        'pickup_time': order_data.get('pickup', {}).get('time') if order_data.get('pickup') else None,
+                        'pickup_address': order_data.get('pickup', {}).get('address') if order_data.get('pickup') else None,
+                        'pickup_map_link': order_data.get('pickup', {}).get('map_link') if order_data.get('pickup') else None,
+                        'delivery_date': order_data.get('delivery', {}).get('date') if order_data.get('delivery') else None,
+                        'delivery_time': order_data.get('delivery', {}).get('time') if order_data.get('delivery') else None,
+                        'delivery_address': order_data.get('delivery', {}).get('address') if order_data.get('delivery') else None,
+                        'delivery_map_link': order_data.get('delivery', {}).get('map_link') if order_data.get('delivery') else None,
+                        'is_urgent': order_data.get('services', {}).get('isUrgent', False),
+                        'total_amount': order_data.get('pricing', {}).get('total', amt),
+                        'payment_method': 'esewa',
+                        'payment_status': 'paid',
+                        'description': f'eSewa Payment - Transaction ID: {refId}'
+                    }
+                    
+                    # Create the order using the serializer
+                    serializer = OrderCreateSerializer(data=order_create_data)
+                    if serializer.is_valid():
+                        order = serializer.save()
+                        response_data['order'] = {
+                            'order_id': str(order.order_id),
+                            'created': True
+                        }
+                    else:
+                        response_data['order'] = {
+                            'created': False,
+                            'errors': serializer.errors
+                        }
+                        
+                except Exception as e:
+                    logger.error(f"Error creating order after payment: {str(e)}")
+                    response_data['order'] = {
+                        'created': False,
+                        'error': str(e)
+                    }
+            
+            return JsonResponse(response_data)
+            
+        except Payment.DoesNotExist:
+            return JsonResponse({
+                'success': False, 
+                'error': 'Payment record not found'
             })
-
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False, 
+                'error': 'Invalid JSON data'
+            })
         except Exception as e:
-            from django.core.exceptions import ObjectDoesNotExist
-            if isinstance(e, ObjectDoesNotExist):
-                return JsonResponse({'success': False, 'error': 'Payment not found'})
-            return JsonResponse({'success': False, 'error': str(e)})
+            logger.exception("Error verifying eSewa payment: %s", e)
+            return JsonResponse({
+                'success': False, 
+                'error': f'Payment verification failed: {str(e)}'
+            })
 
 class PaymentFailureView(View):
     """Payment failure"""

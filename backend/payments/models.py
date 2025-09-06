@@ -34,6 +34,7 @@ class Payment(models.Model):
     payment_type = models.CharField(max_length=10, choices=PAYMENT_TYPE_CHOICES, default='cash')
     transaction_code = models.CharField(max_length=50, blank=True, null=True)
     ref_id = models.CharField(max_length=50, blank=True, null=True)
+    order_data = models.JSONField(blank=True, null=True, help_text="Order data to create order after payment")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
