@@ -13,19 +13,13 @@ class Order(models.Model):
     order_date = models.DateTimeField(auto_now_add=True)
     pickup_enabled = models.BooleanField(default=False)
     delivery_enabled = models.BooleanField(default=False)
-    pickup_date = models.DateField(blank=True, null=True)
-    pickup_time = models.CharField(max_length=50, blank=True, null=True)  # Changed from TimeField to CharField
-    pickup_address = models.TextField(blank=True, null=True)
-    pickup_map_link = models.URLField(blank=True, null=True)
-    delivery_date = models.DateField(blank=True, null=True)
-    delivery_time = models.CharField(max_length=50, blank=True, null=True)  # Changed from TimeField to CharField
-    delivery_address = models.TextField(blank=True, null=True)
-    delivery_map_link = models.URLField(blank=True, null=True)
+    delivery_date = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=[
+        ('asked pickup', 'Asked for Pickup'),
         ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('ready', 'Ready'),
-        ('delivered', 'Delivered'),
+        ('in_progress', 'In Progress'),
+        ('to be delivered', 'To Be Delivered'),
+        ('completed', 'Completed'),
         ('cancelled', 'Cancelled')
     ], default='pending')
     description = models.TextField(blank=True, null=True)
@@ -39,7 +33,6 @@ class Order(models.Model):
     payment_status = models.CharField(max_length=20, choices=[
         ('pending', 'Pending'),
         ('paid', 'Paid'),
-        ('unpaid', 'Unpaid'),
         ('failed', 'Failed')
     ], default='pending')
 

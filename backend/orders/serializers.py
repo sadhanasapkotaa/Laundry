@@ -32,35 +32,34 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating orders with nested order items."""
     services = OrderItemSerializer(many=True, write_only=True)
-    customer = serializers.IntegerField(write_only=True)  # Changed from 'user' to 'customer' and UUIDField to IntegerField
+    user = serializers.UUIDField(write_only=True)
     branch = serializers.IntegerField(write_only=True)
     pickup_date = serializers.DateField(required=False, allow_null=True)
-    pickup_time = serializers.CharField(required=False, allow_blank=True)  # Changed to CharField to handle time slots
+    pickup_time = serializers.TimeField(required=False, allow_null=True)
     pickup_address = serializers.CharField(required=False, allow_blank=True)
     pickup_map_link = serializers.URLField(required=False, allow_blank=True)
     delivery_date = serializers.DateField(required=False, allow_null=True)
-    delivery_time = serializers.CharField(required=False, allow_blank=True)  # Changed to CharField to handle time slots
+    delivery_time = serializers.TimeField(required=False, allow_null=True)
     delivery_address = serializers.CharField(required=False, allow_blank=True)
     delivery_map_link = serializers.URLField(required=False, allow_blank=True)
-    status = serializers.CharField(default='pending')
 
     class Meta:
         model = Order
         fields = [
-            'customer', 'branch', 'services', 'pickup_enabled', 'delivery_enabled',
+            'user', 'branch', 'services', 'pickup_enabled', 'delivery_enabled',
             'pickup_date', 'pickup_time', 'pickup_address', 'pickup_map_link',
             'delivery_date', 'delivery_time', 'delivery_address', 'delivery_map_link',
-            'is_urgent', 'total_amount', 'payment_method', 'payment_status', 'description', 'status'
+            'is_urgent', 'total_amount', 'payment_method', 'payment_status', 'description'
         ]
 
     def create(self, validated_data):
         services_data = validated_data.pop('services')
-        customer_id = validated_data.pop('customer')  # Changed from 'user' to 'customer'
+        user_id = validated_data.pop('user')
         branch_id = validated_data.pop('branch')
 
         # Get user and branch instances
         try:
-            user = User.objects.get(id=customer_id)
+            user = User.objects.get(id=user_id)
             from branches.models import Branch
             branch = Branch.objects.get(id=branch_id)
         except (User.DoesNotExist, Branch.DoesNotExist) as e:

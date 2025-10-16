@@ -48,6 +48,7 @@ export default function RouteProtection({
     if (path.startsWith("/delivery")) return "delivery";
     if (path.startsWith("/customer/dashboard")) return "customer-dashboard";
     if (path.startsWith("/customer")) return "customer";
+    if (path.startsWith("/profile")) return "profile";
     return "dashboard";
   };
 
@@ -65,7 +66,9 @@ export default function RouteProtection({
     // If no user, redirect to login
     if (!user) {
       setIsRedirecting(true);
-      router.push('/login');
+      // Include current path as redirect parameter
+      const redirectParam = pathname !== '/login' ? `?redirect=${encodeURIComponent(pathname)}` : '';
+      router.push(`/login${redirectParam}`);
       return;
     }
 
@@ -100,6 +103,7 @@ export default function RouteProtection({
       "delivery": "/delivery",
       "customer": "/customer/orders",
       "customer-dashboard": "/customer/dashboard",
+      "profile": "/profile",
     };
 
     const route = pageRoutes[page];

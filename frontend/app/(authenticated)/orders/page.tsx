@@ -2,7 +2,7 @@
 "use client";
 
 import "../../types/i18n";
-import React, { JSX, useMemo, useState } from "react";
+import React, { JSX, useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaSearch,
@@ -14,6 +14,7 @@ import {
   FaClock,
   FaCheckCircle,
   FaSpinner,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import {
   ResponsiveContainer,
@@ -29,10 +30,13 @@ import {
   Legend,
 } from "recharts";
 import PaymentService from "../../services/paymentService";
+import { orderAPI, Order as BackendOrder } from "../../services/orderService";
+import { useAuth } from "../../contexts/AuthContext";
 
-type OrderStatus = "received" | "in_progress" | "ready" | "delivered";
+type OrderStatus = "pending" | "processing" | "ready" | "delivered" | "cancelled";
 
-interface Order {
+// Frontend display interface (mapped from backend)
+interface DisplayOrder {
   id: string;
   customerName: string;
   customerPhone: string;
@@ -40,31 +44,48 @@ interface Order {
   items: string[];
   status: OrderStatus;
   amount: number;
-  receivedDate: string; // ISO or YYYY-MM-DD
+  receivedDate: string;
   deliveryDate?: string;
   branchId: string;
   branchName: string;
   notes?: string;
+  paymentMethod: string;
+  paymentStatus: string;
 }
 
 const STATUS_META: Record<
   OrderStatus,
   { color: string; labelKey: string; Icon: React.ComponentType<any> }
 > = {
-  received: { color: "bg-blue-100 text-blue-800", labelKey: "orders.status.received", Icon: FaBoxOpen },
-  in_progress: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.status.in_progress", Icon: FaClock },
+  pending: { color: "bg-blue-100 text-blue-800", labelKey: "orders.status.pending", Icon: FaBoxOpen },
+  processing: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.status.processing", Icon: FaClock },
   ready: { color: "bg-green-100 text-green-800", labelKey: "orders.status.ready", Icon: FaCheckCircle },
   delivered: { color: "bg-gray-100 text-gray-800", labelKey: "orders.status.delivered", Icon: FaTruck },
+  cancelled: { color: "bg-red-100 text-red-800", labelKey: "orders.status.cancelled", Icon: FaExclamationTriangle },
+};
+
+const PAYMENT_STATUS_META: Record<
+  'pending' | 'paid' | 'unpaid' | 'failed',
+  { color: string; labelKey: string; Icon: React.ComponentType<any> }
+> = {
+  pending: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.paymentStatus.pending", Icon: FaClock },
+  paid: { color: "bg-green-100 text-green-800", labelKey: "orders.paymentStatus.paid", Icon: FaCheckCircle },
+  unpaid: { color: "bg-red-100 text-red-800", labelKey: "orders.paymentStatus.unpaid", Icon: FaExclamationTriangle },
+  failed: { color: "bg-red-100 text-red-800", labelKey: "orders.paymentStatus.failed", Icon: FaExclamationTriangle },
 };
 
 export default function OrderManagement(): JSX.Element {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   // UI state
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     customerName: "",
@@ -78,66 +99,76 @@ export default function OrderManagement(): JSX.Element {
     paymentMethod: "cash", // Add payment method to form
   });
 
-  // Mock data (keeps your sample)
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: "ORD-001",
-      customerName: "Ram Sharma",
-      customerPhone: "+977-9841234567",
-      service: "Wash & Fold",
-      items: ["Shirts (5)", "Pants (3)", "Towels (2)"],
-      status: "received",
-      amount: 850,
-      receivedDate: "2025-01-06",
-      branchId: "1",
-      branchName: "Main Branch",
-      notes: "Handle with care - delicate fabric",
-    },
-    {
-      id: "ORD-002",
-      customerName: "Sita Rai",
-      customerPhone: "+977-9851234567",
-      service: "Dry Cleaning",
-      items: ["Suit (1)", "Dress (2)"],
-      status: "in_progress",
-      amount: 1200,
-      receivedDate: "2025-01-05",
-      branchId: "1",
-      branchName: "Main Branch",
-    },
-    {
-      id: "ORD-003",
-      customerName: "John Doe",
-      customerPhone: "+977-9861234567",
-      service: "Express Wash",
-      items: ["Shirts (8)", "Undergarments (10)"],
-      status: "ready",
-      amount: 950,
-      receivedDate: "2025-01-05",
-      deliveryDate: "2025-01-06",
-      branchId: "2",
-      branchName: "Downtown Branch",
-    },
-    {
-      id: "ORD-004",
-      customerName: "Maya Gurung",
-      customerPhone: "+977-9871234567",
-      service: "Iron Only",
-      items: ["Formal Wear (6)"],
-      status: "delivered",
-      amount: 450,
-      receivedDate: "2025-01-04",
-      deliveryDate: "2025-01-05",
-      branchId: "1",
-      branchName: "Main Branch",
-    },
-  ]);
+  // Orders state - using backend data
+  const [orders, setOrders] = useState<DisplayOrder[]>([]);
+
+  // Function to map backend order to display format
+  const mapBackendOrderToDisplay = (backendOrder: BackendOrder): DisplayOrder => {
+    const services = backendOrder.order_items || [];
+    const items = services.map((service: any) => 
+      `${service.service_type} (${service.quantity})`
+    );
+
+    // Safe date parsing with fallback
+    let receivedDate = new Date().toISOString().split("T")[0]; // Default to today
+    try {
+      if (backendOrder.order_date) {
+        const parsedDate = new Date(backendOrder.order_date);
+        if (!isNaN(parsedDate.getTime())) {
+          receivedDate = parsedDate.toISOString().split("T")[0];
+        }
+      }
+    } catch (error) {
+      console.warn('Error parsing order_date:', backendOrder.order_date, error);
+    }
+
+    return {
+      id: backendOrder.order_id.toString(),
+      customerName: backendOrder.customer_name || "Unknown Customer",
+      customerPhone: "N/A", // Not available in current backend model
+      service: services.length > 0 ? services[0].service_type : "Mixed Services",
+      items,
+      status: backendOrder.status as OrderStatus,
+      amount: Number(backendOrder.total_amount),
+      receivedDate,
+      deliveryDate: backendOrder.delivery_date || undefined,
+      branchId: "1", // Branch is a string name in backend, defaulting to 1
+      branchName: backendOrder.branch.toString() || "Main Branch",
+      notes: backendOrder.description || undefined,
+      paymentMethod: backendOrder.payment_method,
+      paymentStatus: backendOrder.payment_status,
+    };
+  };
+
+  // Fetch orders from backend
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const backendOrders = await orderAPI.list({
+        ordering: '-order_date' // Get newest orders first
+      });
+      const displayOrders = backendOrders.map(mapBackendOrderToDisplay);
+      setOrders(displayOrders);
+    } catch (err: any) {
+      console.error('Error fetching orders:', err);
+      setError(err.message || 'Failed to fetch orders');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load orders on component mount
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   // Derived data
   const filteredOrders = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return orders.filter((o) => {
       if (statusFilter !== "all" && o.status !== statusFilter) return false;
+      if (paymentStatusFilter !== "all" && o.paymentStatus !== paymentStatusFilter) return false;
       if (!q) return true;
       return (
         o.customerName.toLowerCase().includes(q) ||
@@ -146,16 +177,21 @@ export default function OrderManagement(): JSX.Element {
         o.branchName.toLowerCase().includes(q)
       );
     });
-  }, [orders, searchTerm, statusFilter]);
+  }, [orders, searchTerm, statusFilter, paymentStatusFilter]);
 
   const statusCounts = useMemo(() => {
     const map: Record<OrderStatus, number> = {
-      received: 0,
-      in_progress: 0,
+      pending: 0,
+      processing: 0,
       ready: 0,
       delivered: 0,
+      cancelled: 0,
     };
-    orders.forEach((o) => (map[o.status] = (map[o.status] || 0) + 1));
+    orders.forEach((o) => {
+      if (o.status in map) {
+        map[o.status as OrderStatus] = (map[o.status as OrderStatus] || 0) + 1;
+      }
+    });
     return map;
   }, [orders]);
 
@@ -207,21 +243,27 @@ export default function OrderManagement(): JSX.Element {
     setIsProcessingPayment(true);
 
     try {
-      // Create order locally first (in a real app, this would be an API call)
-      const nextId = `ORD-${String(orders.length + 1).padStart(3, "0")}`;
-      const newOrder: Order = {
-        id: nextId,
-        customerName: form.customerName || "Unnamed",
-        customerPhone: form.customerPhone || "",
-        service: form.service,
-        items: form.items ? form.items.split(",").map((s) => s.trim()) : [],
-        status: "received",
-        amount: orderAmount,
-        receivedDate: new Date().toISOString().split("T")[0],
-        branchId: form.branchId,
-        branchName: form.branchName,
-        notes: form.notes || undefined,
+      // Prepare order data for backend API
+      const orderData = {
+        customer_name: form.customerName,
+        description: form.notes || '',
+        total_amount: orderAmount,
+        payment_method: form.paymentMethod,
+        payment_status: 'pending',
+        status: 'pending',
+        branch: form.branchName,
+        order_items: [
+          {
+            service_type: form.service,
+            quantity: 1,
+            price: orderAmount
+          }
+        ]
       };
+
+      // Create order using backend API
+      const createdOrder = await orderAPI.create(orderData);
+      console.log('Order created successfully:', createdOrder);
 
       // Handle payment based on method
       if (form.paymentMethod === 'esewa') {
@@ -229,20 +271,18 @@ export default function OrderManagement(): JSX.Element {
         const paymentResponse = await PaymentService.initiatePayment({
           payment_type: 'esewa',
           amount: orderAmount,
-          order_id: nextId,
+          order_id: createdOrder.order_id.toString(),
         });
 
         if (paymentResponse.success && paymentResponse.payment_data && paymentResponse.esewa_url) {
-          // Add order to list
-          setOrders((prev) => [newOrder, ...prev]);
-          
           // Show success message and redirect to eSewa
-          alert(`Order ${nextId} created successfully! Redirecting to eSewa for payment of Rs. ${orderAmount}...`);
+          alert(`Order ${createdOrder.order_id} created successfully! Redirecting to eSewa for payment of Rs. ${orderAmount}...`);
           
           // Submit to eSewa
           PaymentService.submitEsewaPayment(paymentResponse.payment_data, paymentResponse.esewa_url);
           
           closeAdd();
+          fetchOrders(); // Refresh orders list
         } else {
           alert(`Failed to initiate eSewa payment: ${paymentResponse.error || 'Unknown error'}`);
         }
@@ -251,18 +291,16 @@ export default function OrderManagement(): JSX.Element {
         const paymentResponse = await PaymentService.initiatePayment({
           payment_type: 'bank',
           amount: orderAmount,
-          order_id: nextId,
+          order_id: createdOrder.order_id.toString(),
         });
 
         if (paymentResponse.success && paymentResponse.bank_details) {
-          // Add order to list
-          setOrders((prev) => [newOrder, ...prev]);
-          
           // Show bank details
           const bankDetails = paymentResponse.bank_details;
-          alert(`Order ${nextId} created successfully!\n\nBank Transfer Details:\nAccount Name: ${bankDetails.account_name}\nAccount Number: ${bankDetails.account_number}\nBank: ${bankDetails.bank_name}\nSWIFT: ${bankDetails.swift_code}\n\nPlease transfer Rs. ${orderAmount} and keep the receipt.`);
+          alert(`Order ${createdOrder.order_id} created successfully!\n\nBank Transfer Details:\nAccount Name: ${bankDetails.account_name}\nAccount Number: ${bankDetails.account_number}\nBank: ${bankDetails.bank_name}\nSWIFT: ${bankDetails.swift_code}\n\nPlease transfer Rs. ${orderAmount} and keep the receipt.`);
           
           closeAdd();
+          fetchOrders(); // Refresh orders list
         } else {
           alert(`Failed to create bank payment: ${paymentResponse.error || 'Unknown error'}`);
         }
@@ -271,33 +309,95 @@ export default function OrderManagement(): JSX.Element {
         const paymentResponse = await PaymentService.initiatePayment({
           payment_type: 'cash',
           amount: orderAmount,
-          order_id: nextId,
+          order_id: createdOrder.order_id.toString(),
         });
 
         if (paymentResponse.success) {
-          // Add order to list
-          setOrders((prev) => [newOrder, ...prev]);
-          alert(`Order ${nextId} created successfully! Payment will be collected on delivery (Rs. ${orderAmount}).`);
+          alert(`Order ${createdOrder.order_id} created successfully! Payment will be collected on delivery (Rs. ${orderAmount}).`);
           closeAdd();
+          fetchOrders(); // Refresh orders list
         } else {
           alert(`Failed to create order: ${paymentResponse.error || 'Unknown error'}`);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Order creation error:', error);
-      alert('Failed to create order. Please try again.');
+      
+      // Show more specific error message
+      let errorMessage = 'Failed to create order. Please try again.';
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`Error: ${errorMessage}`);
     } finally {
       setIsProcessingPayment(false);
     }
   };
 
-  const handleChangeStatus = (orderId: string, next: OrderStatus) => {
-    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: next } : o)));
+  const handleChangeStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      // Find the order to get its backend ID
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      // Update status in backend
+      await orderAPI.update(orderId, { status: newStatus });
+      
+      // Update local state
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+      
+      // Refresh orders to get latest data
+      fetchOrders();
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert('Failed to update order status. Please try again.');
+    }
+  };
+
+  const handleChangePaymentStatus = async (orderId: string, newPaymentStatus: 'pending' | 'paid' | 'unpaid' | 'failed') => {
+    try {
+      // Find the order to get its backend ID
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      // Update payment status in backend
+      await orderAPI.update(orderId, { payment_status: newPaymentStatus });
+      
+      // Update local state
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, paymentStatus: newPaymentStatus } : o)));
+      
+      // Refresh orders to get latest data
+      fetchOrders();
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      alert('Failed to update payment status. Please try again.');
+    }
   };
 
   // Small status badge
   const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
     const meta = STATUS_META[status];
+    const Icon = meta.Icon;
+    return (
+      <span className={`inline-flex items-center gap-2 px-2 py-1 text-xs rounded-full ${meta.color}`}>
+        <Icon className="w-3 h-3" />
+        <span>{t(meta.labelKey)}</span>
+      </span>
+    );
+  };
+
+  // Payment status badge
+  const PaymentStatusBadge: React.FC<{ status: 'pending' | 'paid' | 'unpaid' | 'failed' }> = ({ status }) => {
+    const meta = PAYMENT_STATUS_META[status];
     const Icon = meta.Icon;
     return (
       <span className={`inline-flex items-center gap-2 px-2 py-1 text-xs rounded-full ${meta.color}`}>
@@ -326,6 +426,24 @@ export default function OrderManagement(): JSX.Element {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">{t("orders.title", "Orders")}</h1>
           <p className="text-sm text-gray-600">{t("orders.subtitle", "Manage laundry orders, status and revenue")}</p>
+          {isLoading && (
+            <div className="flex items-center gap-2 text-blue-600 text-sm mt-1">
+              <FaSpinner className="animate-spin" />
+              <span>Loading orders...</span>
+            </div>
+          )}
+          {error && (
+            <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+              <FaExclamationTriangle />
+              <span>{error}</span>
+              <button 
+                onClick={fetchOrders}
+                className="underline hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -347,10 +465,24 @@ export default function OrderManagement(): JSX.Element {
             aria-label={t("orders.filterByStatus", "Filter by status")}
           >
             <option value="all">{t("orders.filter.all", "All Status")}</option>
-            <option value="received">{t("orders.status.received")}</option>
-            <option value="in_progress">{t("orders.status.in_progress")}</option>
+            <option value="pending">{t("orders.status.pending")}</option>
+            <option value="processing">{t("orders.status.processing")}</option>
             <option value="ready">{t("orders.status.ready")}</option>
             <option value="delivered">{t("orders.status.delivered")}</option>
+            <option value="cancelled">{t("orders.status.cancelled")}</option>
+          </select>
+
+          <select
+            value={paymentStatusFilter}
+            onChange={(e) => setPaymentStatusFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-white"
+            aria-label={t("orders.filterByPaymentStatus", "Filter by payment status")}
+          >
+            <option value="all">{t("orders.filter.allPayment", "All Payment Status")}</option>
+            <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
+            <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
+            <option value="unpaid">{t("orders.paymentStatus.unpaid", "Unpaid")}</option>
+            <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
           </select>
 
           <button
@@ -416,6 +548,7 @@ export default function OrderManagement(): JSX.Element {
                 <th className="px-3 py-2">{t("orders.customer", "Customer")}</th>
                 <th className="px-3 py-2">{t("orders.service", "Service")}</th>
                 <th className="px-3 py-2">{t("orders.statusLabel", "Status")}</th>
+                <th className="px-3 py-2">{t("orders.paymentStatus", "Payment Status")}</th>
                 <th className="px-3 py-2">{t("orders.amount", "Amount")}</th>
                 <th className="px-3 py-2">{t("orders.branch", "Branch")}</th>
                 <th className="px-3 py-2">{t("orders.date", "Date")}</th>
@@ -436,7 +569,37 @@ export default function OrderManagement(): JSX.Element {
                     <div className="text-xs text-gray-500">{order.items.join(", ")}</div>
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <StatusBadge status={order.status} />
+                    <div className="flex flex-col gap-2">
+                      <StatusBadge status={order.status} />
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleChangeStatus(order.id, e.target.value as OrderStatus)}
+                        aria-label={t("orders.changeStatus", "Change status")}
+                        className="px-2 py-1 border rounded-md text-xs"
+                      >
+                        <option value="pending">{t("orders.status.pending")}</option>
+                        <option value="processing">{t("orders.status.processing")}</option>
+                        <option value="ready">{t("orders.status.ready")}</option>
+                        <option value="delivered">{t("orders.status.delivered")}</option>
+                        <option value="cancelled">{t("orders.status.cancelled")}</option>
+                      </select>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="flex flex-col gap-2">
+                      <PaymentStatusBadge status={order.paymentStatus as 'pending' | 'paid' | 'unpaid' | 'failed'} />
+                      <select
+                        value={order.paymentStatus}
+                        onChange={(e) => handleChangePaymentStatus(order.id, e.target.value as 'pending' | 'paid' | 'unpaid' | 'failed')}
+                        aria-label={t("orders.changePaymentStatus", "Change payment status")}
+                        className="px-2 py-1 border rounded-md text-xs"
+                      >
+                        <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
+                        <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
+                        <option value="unpaid">{t("orders.paymentStatus.unpaid", "Unpaid")}</option>
+                        <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
+                      </select>
+                    </div>
                   </td>
                   <td className="px-3 py-3 align-top">₨ {order.amount.toLocaleString()}</td>
                   <td className="px-3 py-3 align-top">{order.branchName}</td>
@@ -460,21 +623,6 @@ export default function OrderManagement(): JSX.Element {
                       >
                         <FaEdit />
                       </button>
-
-                      {/* quick status change menu (simple) */}
-                      <div className="relative inline-block">
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleChangeStatus(order.id, e.target.value as OrderStatus)}
-                          aria-label={t("orders.changeStatus", "Change status")}
-                          className="px-2 py-1 border rounded-md text-sm"
-                        >
-                          <option value="received">{t("orders.status.received")}</option>
-                          <option value="in_progress">{t("orders.status.in_progress")}</option>
-                          <option value="ready">{t("orders.status.ready")}</option>
-                          <option value="delivered">{t("orders.status.delivered")}</option>
-                        </select>
-                      </div>
                     </div>
                   </td>
                 </tr>
@@ -482,7 +630,7 @@ export default function OrderManagement(): JSX.Element {
 
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={9} className="px-3 py-6 text-center text-gray-500">
                     {t("orders.empty", "No orders found")}
                   </td>
                 </tr>
@@ -493,8 +641,8 @@ export default function OrderManagement(): JSX.Element {
       </div>
 
       {/* Status summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {(["received", "in_progress", "ready", "delivered"] as OrderStatus[]).map((k, idx) => (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {(["pending", "processing", "ready", "delivered", "cancelled"] as OrderStatus[]).map((k, idx) => (
           <div key={k} className="p-4 border rounded-lg bg-white shadow-sm">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">{t(STATUS_META[k].labelKey)}</div>

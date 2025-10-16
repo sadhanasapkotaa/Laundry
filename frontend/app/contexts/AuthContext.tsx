@@ -15,7 +15,7 @@ export interface User {
   is_verified: boolean;
   is_active: boolean;
   date_joined: string;
-  last_login: string;
+  last_login: string | null;
 }
 
 interface AuthContextType {

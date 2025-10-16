@@ -18,6 +18,7 @@ export const PAGE_PERMISSIONS: PagePermissions = {
   '/roles': ['admin'], // Only admin can manage roles
   '/backup-export': ['admin'],
   '/delivery': ['admin', 'branch_manager', 'rider'],
+  '/profile': ['admin', 'branch_manager', 'accountant', 'rider'], // Staff profile
   
   // Customer-specific pages
   '/customer/dashboard': ['customer'],

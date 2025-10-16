@@ -10,9 +10,9 @@ urlpatterns = [
     # Order endpoints
     path('', OrderListView.as_view(), name='order-list'),
     path('create/', OrderCreateView.as_view(), name='order-create'),
-    path('<uuid:pk>/', OrderDetailView.as_view(), name='order-detail'),
-    path('<uuid:pk>/update/', OrderUpdateView.as_view(), name='order-update'),
-    path('<uuid:pk>/delete/', OrderDeleteView.as_view(), name='order-delete'),
+    path('<int:pk>/', OrderDetailView.as_view(), name='order-detail'),
+    path('<int:pk>/update/', OrderUpdateView.as_view(), name='order-update'),
+    path('<int:pk>/delete/', OrderDeleteView.as_view(), name='order-delete'),
 
     # Delivery endpoints
     path('deliveries/', DeliveryListView.as_view(), name='delivery-list'),

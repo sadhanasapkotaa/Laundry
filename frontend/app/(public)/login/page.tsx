@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useLogin } from '../../queries/authQueries';
 import { LoginRequest } from '../../types/auth';
 
 const LoginPage = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { mutate: login, isPending, error } = useLogin();
   
   const [formData, setFormData] = useState<LoginRequest>({
     email: '',
     password: '',
   });
+
+  // Get redirect URL from query parameters (if user was redirected from a protected page)
+  const redirectTo = searchParams?.get('redirect') || null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -30,33 +34,12 @@ const LoginPage = () => {
         console.log('Login successful:', data);
         console.log('User role from response:', data.role);
         
-        // Role-based redirection
-        switch (data.role) {
-          case 'admin':
-            console.log('Redirecting to admin dashboard');
-            router.push('/dashboard');
-            break;
-          case 'branch_manager':
-            console.log('Redirecting to branch manager dashboard');
-            router.push('/dashboard');
-            break;
-          case 'accountant':
-            console.log('Redirecting to accountant dashboard');
-            router.push('/dashboard');
-            break;
-          case 'rider':
-            console.log('Redirecting to rider dashboard');
-            router.push('/delivery');
-            break;
-          case 'customer':
-            console.log('Redirecting to customer dashboard');
-            router.push('/customer/dashboard');
-            break;
-          default:
-            console.log('Unknown role, redirecting to default dashboard');
-            router.push('/dashboard');
-            break;
-        }
+        // Always redirect to dashboard after successful login
+        const redirectPath = '/dashboard';
+        console.log('Redirecting to dashboard:', redirectPath);
+        
+        // Use replace instead of push to prevent going back to login page
+        router.replace(redirectPath);
       },
       onError: (error) => {
         console.error('Login failed:', error);
