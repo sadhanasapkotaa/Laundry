@@ -204,13 +204,14 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-# "heartfeltlovestory@gmail.com"
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
-# "jxwdirgsmqctpnte"
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # Add this line
 
-
-
+DJANGO_SUPERUSER_EMAIL= env("DJANGO_SUPERUSER_EMAIL")
+DJANGO_SUPERUSER_PASSWORD= env("DJANGO_SUPERUSER_PASSWORD")
+DJANGO_SUPERUSER_FIRST_NAME= env("DJANGO_SUPERUSER_FIRST_NAME")
+DJANGO_SUPERUSER_LAST_NAME= env("DJANGO_SUPERUSER_LAST_NAME")
+DJANGO_SUPERUSER_PHONE= env("DJANGO_SUPERUSER_PHONE")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -231,6 +232,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Media files
 MEDIA_URL = '/media/'
@@ -244,9 +246,6 @@ ESEWA_PRODUCT_CODE = 'EPAYTEST'  # UAT Product Code
 ESEWA_PAYMENT_URL = 'https://rc-epay.esewa.com.np/api/epay/main/v2/form'
 ESEWA_STATUS_CHECK_URL = 'https://rc.esewa.com.np/api/epay/transaction/status/'
 
-# For Production, use these URLs:
-# ESEWA_PAYMENT_URL = 'https://epay.esewa.com.np/api/epay/main/v2/form'
-# ESEWA_STATUS_CHECK_URL = 'https://epay.esewa.com.np/api/epay/transaction/status/'
 
 # Frontend URL for success/failure redirects
-FRONTEND_URL = 'http://localhost:3000'  # Change to your Next.js app URL
+FRONTEND_URL = 'http://localhost:3000' 
