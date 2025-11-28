@@ -48,7 +48,7 @@ export default function PermissionDenied() {
 
           {/* Message */}
           <p className="text-gray-600 dark:text-gray-400 mb-2">
-            You don't have permission to access this page.
+            You don&apos;t have permission to access this page.
           </p>
           
           {user?.role && (

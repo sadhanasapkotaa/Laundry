@@ -60,9 +60,10 @@ const EditBranch = () => {
         status: branch.status,
         opening_date: branch.opening_date,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching branch:', error);
-      alert(`Error fetching branch: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error fetching branch: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -129,9 +130,10 @@ const EditBranch = () => {
       await branchAPI.update(branchId, formData);
       alert("Branch updated successfully!");
       router.push(`/branch/${branchId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating branch:", error);
-      alert(`Error updating branch: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error updating branch: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }

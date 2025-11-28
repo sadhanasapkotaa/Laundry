@@ -108,7 +108,7 @@ const UnauthorizedPage = () => {
             
             <div className="space-y-4 mb-8">
               <p className="text-lg text-gray-600">
-                You don't have the required permissions to {attemptedAction}.
+                You don&apos;t have the required permissions to {attemptedAction}.
               </p>
               
               {isAuthenticated && user && (

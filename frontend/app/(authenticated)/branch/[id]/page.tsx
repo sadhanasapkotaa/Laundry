@@ -72,9 +72,10 @@ const BranchDetail = () => {
       setLoading(true);
       const fetchedBranch = await branchAPI.detail(branchId);
       setBranch(fetchedBranch);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching branch:', error);
-      alert(`Error fetching branch: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error fetching branch: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -95,9 +96,10 @@ const BranchDetail = () => {
         await branchAPI.delete(branchId);
         alert('Branch deleted successfully');
         router.push('/branch');
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error deleting branch:', error);
-        alert(`Error deleting branch: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Error deleting branch: ${errorMessage}`);
       }
     }
   };

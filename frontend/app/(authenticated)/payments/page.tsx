@@ -105,7 +105,7 @@ const PaymentsPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showNewPayment, setShowNewPayment] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
-  const [bankDetails, setBankDetails] = useState<any>(null);
+  const [bankDetails, setBankDetails] = useState<{ account_name: string; account_number: string; bank_name: string; swift_code: string } | null>(null);
   const [transactionUuid, setTransactionUuid] = useState('');
   
   const [filters, setFilters] = useState<PaymentFilters>({
@@ -186,7 +186,7 @@ const PaymentsPage: React.FC = () => {
     loadPaymentHistory();
   };
 
-  const handlePaymentInitiated = (result: any) => {
+  const handlePaymentInitiated = (result: { success: boolean; payment_type?: string; bank_details?: { account_name: string; account_number: string; bank_name: string; swift_code: string }; transaction_uuid?: string }) => {
     if (result.success) {
       if (result.payment_type === 'bank' && result.bank_details) {
         setBankDetails(result.bank_details);

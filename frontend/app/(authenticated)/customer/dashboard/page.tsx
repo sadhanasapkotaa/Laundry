@@ -39,7 +39,7 @@ export default function CustomerDashboardPage() {
           Welcome back, {user?.first_name}!
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Here's what's happening with your laundry orders.
+          Here&apos;s what&apos;s happening with your laundry orders.
         </p>
       </div>
 

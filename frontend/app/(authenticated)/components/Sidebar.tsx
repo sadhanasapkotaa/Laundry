@@ -158,7 +158,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
     (item) => displayUser && item.roles.includes(displayUser.role)
   );
 
-  const handleNavigation = (item: any) => {
+  const handleNavigation = (item: { path: string; id: string }) => {
     router.push(item.path);
     onPageChange(item.id);
   };
@@ -369,7 +369,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
               </div>
               <button
                 onClick={() => {
-                  logout && logout();
+                  if (logout) logout();
                   setIsMobileOpen(false);
                 }}
                 className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"

@@ -35,20 +35,23 @@ const authApi = {
       const response = await api.post('/auth/login/', data);
       console.log('Login response:', response.data);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorResponse = error && typeof error === 'object' && 'response' in error 
+        ? error as { response?: { status?: number; statusText?: string; data?: unknown; headers?: unknown }; config?: { url?: string; method?: string; data?: unknown } }
+        : null;
       console.error('Login error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        headers: error.response?.headers,
+        status: errorResponse?.response?.status,
+        statusText: errorResponse?.response?.statusText,
+        data: errorResponse?.response?.data,
+        headers: errorResponse?.response?.headers,
         config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          data: error.config?.data,
-          headers: error.config?.headers,
+          url: errorResponse?.config?.url,
+          method: errorResponse?.config?.method,
+          data: errorResponse?.config?.data,
+          headers: errorResponse?.config?.headers,
         }
       });
-      throw error;
+      throw error instanceof Error ? error : new Error('Login failed');
     }
   },
 

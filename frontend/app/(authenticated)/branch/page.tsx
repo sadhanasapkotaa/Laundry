@@ -67,14 +67,15 @@ export default function BranchManagement() {
       
       setBranches(branchesArray);
       setFilteredBranches(branchesArray);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching branches:', error);
       
       // Set empty array to prevent map errors
       setBranches([]);
       setFilteredBranches([]);
       
-      alert(`Error fetching branches: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error fetching branches: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -118,8 +119,8 @@ export default function BranchManagement() {
 
     // Apply sorting
     filtered.sort((a, b) => {
-      let aValue: any = a[sortBy as keyof Branch];
-      let bValue: any = b[sortBy as keyof Branch];
+      let aValue: string | number = a[sortBy as keyof Branch] as string | number;
+      let bValue: string | number = b[sortBy as keyof Branch] as string | number;
 
       // Handle special sorting cases
       if (sortBy === "monthly_revenue" || sortBy === "monthly_expenses") {
@@ -130,7 +131,7 @@ export default function BranchManagement() {
         bValue = b.monthly_revenue - b.monthly_expenses;
       }
 
-      if (typeof aValue === "string") {
+      if (typeof aValue === "string" && typeof bValue === "string") {
         aValue = aValue.toLowerCase();
         bValue = bValue.toLowerCase();
       }
@@ -156,9 +157,10 @@ export default function BranchManagement() {
         await branchAPI.delete(branchId);
         setBranches(branches.filter(branch => branch.id !== branchId));
         alert('Branch deleted successfully');
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error deleting branch:', error);
-        alert(`Error deleting branch: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Error deleting branch: ${errorMessage}`);
       }
     }
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import "../../../../../types/i18n";
+import "../../../types/i18n";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { 

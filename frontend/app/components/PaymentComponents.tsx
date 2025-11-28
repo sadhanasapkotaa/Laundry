@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { PaymentService, PaymentInitiateRequest } from '../services/paymentService';
 
 interface PaymentMethodSelectorProps {
-  onPaymentInitiated: (result: any) => void;
+  onPaymentInitiated: (result: { success: boolean; error?: string; payment_type?: string }) => void;
   amount: number;
   orderId?: string;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import "../../../../../../types/i18n";
+import "../../../../types/i18n";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { FaUser, FaBuilding, FaMoneyBillWave, FaCalendar, FaArrowLeft } from "react-icons/fa";
@@ -449,7 +449,7 @@ export default function EditBranchManager() {
               >
                 <option value="citizenship">Citizenship Certificate</option>
                 <option value="national_id">National ID Card</option>
-                <option value="drivers_licence">Driver's License</option>
+                <option value="drivers_licence">Driver&apos;s License</option>
                 <option value="passport">Passport</option>
               </select>
               {errors.id_type && (

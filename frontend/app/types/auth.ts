@@ -103,5 +103,5 @@ export interface ApiError {
   message?: string;
   detail?: string;
   non_field_errors?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }

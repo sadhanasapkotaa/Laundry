@@ -1,6 +1,6 @@
 "use client";
 
-import "../../../../types/i18n";
+import "../../../types/i18n";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FaUser, FaBuilding, FaMoneyBillWave, FaCalendar, FaArrowLeft, FaEye, FaEyeSlash } from "react-icons/fa";
@@ -48,9 +48,10 @@ export default function AddBranchManager() {
     try {
       const fetchedBranches = await branchAPI.list({ status: 'active' });
       setBranches(fetchedBranches);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching branches:', error);
-      alert(`Error fetching branches: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error fetching branches: ${errorMessage}`);
     }
   };
 
@@ -119,7 +120,7 @@ export default function AddBranchManager() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    let convertedValue: any = value;
+    let convertedValue: string | number = value;
 
     // Convert numeric fields
     if (name === 'branch' || name === 'salary') {
@@ -153,9 +154,10 @@ export default function AddBranchManager() {
       await branchManagerAPI.create(formData);
       alert("Branch manager created successfully!");
       router.push("/branch-manager");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating branch manager:", error);
-      alert(`Failed to create branch manager: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create branch manager: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -405,7 +407,7 @@ export default function AddBranchManager() {
               >
                 <option value="citizenship">Citizenship Certificate</option>
                 <option value="national_id">National ID Card</option>
-                <option value="drivers_licence">Driver's License</option>
+                <option value="drivers_licence">Driver&apos;s License</option>
                 <option value="passport">Passport</option>
               </select>
               {errors.id_type && (

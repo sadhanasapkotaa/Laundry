@@ -25,6 +25,16 @@ let accessToken: string | null = null;
 const UserService = {
   setAccessToken: (token: string) => {
     accessToken = token;
+    localStorage.setItem("accessToken", token);
+  },
+
+  getAccessToken: (): string | null => {
+    return accessToken || localStorage.getItem("accessToken");
+  },
+
+  clearAccessToken: () => {
+    accessToken = null;
+    localStorage.removeItem("accessToken");
   },
 
   register: async (payload: {
@@ -62,6 +72,8 @@ const UserService = {
     if (!res.ok) throw new Error("Login failed");
     const data: AuthResponse = await res.json();
     accessToken = data.access; // store access token after login
+    // Also store in localStorage for persistence
+    localStorage.setItem("accessToken", data.access);
     return data;
   },
 
@@ -74,11 +86,14 @@ const UserService = {
     if (!res.ok) throw new Error("Token refresh failed");
     const data = await res.json();
     accessToken = data.access; // update token
+    // Also update localStorage
+    localStorage.setItem("accessToken", data.access);
     return data;
   },
 
   getProfile: async (): Promise<User> => {
-    const token = localStorage.getItem("accessToken");
+    // Use stored accessToken, fallback to localStorage if not set
+    const token = accessToken || localStorage.getItem("accessToken");
     if (!token) throw new Error("No access token found");
 
     const res = await fetch(`${API_BASE}/profile/`, {
@@ -89,7 +104,8 @@ const UserService = {
   },
 
   updateProfile: async (payload: Partial<User>): Promise<User> => {
-    const token = localStorage.getItem("accessToken");
+    // Use stored accessToken, fallback to localStorage if not set
+    const token = accessToken || localStorage.getItem("accessToken");
     if (!token) throw new Error("No access token found");
 
     const res = await fetch(`${API_BASE}/update-profile/`, {
@@ -105,7 +121,8 @@ const UserService = {
   },
 
   logout: async (): Promise<{ message: string }> => {
-    const token = localStorage.getItem("accessToken");
+    // Use stored accessToken, fallback to localStorage if not set
+    const token = accessToken || localStorage.getItem("accessToken");
     if (!token) throw new Error("No access token found");
 
     const res = await fetch(`${API_BASE}/logout/`, {
@@ -113,6 +130,8 @@ const UserService = {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error("Logout failed");
+    // Clear the accessToken after logout
+    accessToken = null;
     return res.json();
   },
 

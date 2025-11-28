@@ -148,7 +148,7 @@ export class PaymentService {
   /**
    * Check payment status
    */
-  static async checkPaymentStatus(transactionUuid: string): Promise<any> {
+  static async checkPaymentStatus(transactionUuid: string): Promise<{ success: boolean; status?: string; error?: string }> {
     try {
       const response = await apiRequest(API_CONFIG.ENDPOINTS.PAYMENTS.STATUS(transactionUuid), {
         method: 'GET',

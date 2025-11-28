@@ -210,7 +210,7 @@ export default function ClientDashboard() {
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
+          onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive" | "vip")}
           className="border rounded p-2"
         >
           <option value="all">All Status</option>

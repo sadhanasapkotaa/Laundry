@@ -50,7 +50,7 @@ const VerifyOTPPage = () => {
             Verify your email
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            We've sent a verification code to {formData.email}
+            We&apos;ve sent a verification code to {formData.email}
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -114,7 +114,7 @@ const VerifyOTPPage = () => {
                   console.log('Resend OTP');
                 }}
               >
-                Didn't receive the code? Resend
+                Didn&apos;t receive the code? Resend
               </button>
             </div>
           </div>

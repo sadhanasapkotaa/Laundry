@@ -94,7 +94,7 @@ export default function FailurePage() {
         <div className="bg-red-600 text-white p-6 text-center">
           <FailureIcon className={`text-6xl mx-auto mb-4 ${failureInfo.iconColor} bg-white rounded-full p-3`} />
           <h1 className="text-3xl font-bold mb-2">{failureInfo.title}</h1>
-          <p className="text-red-100">We're sorry, but something went wrong with your order.</p>
+          <p className="text-red-100">We&apos;re sorry, but something went wrong with your order.</p>
         </div>
 
         {/* Error Details */}
@@ -184,7 +184,7 @@ export default function FailurePage() {
             <div className="flex items-start gap-3">
               <FaExclamationTriangle className="text-yellow-600 mt-1" />
               <div>
-                <h4 className="font-semibold text-yellow-800 mb-1">Don't Worry!</h4>
+                <h4 className="font-semibold text-yellow-800 mb-1">Don&apos;t Worry!</h4>
                 <p className="text-sm text-yellow-700">
                   No charges have been made to your account. Your order data is safe, and you can try placing the order again when ready.
                 </p>

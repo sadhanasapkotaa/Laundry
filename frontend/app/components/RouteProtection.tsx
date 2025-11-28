@@ -2,6 +2,7 @@
 
 import { useAuth } from "../contexts/AuthContext";
 import { hasPagePermission, shouldRedirect } from "../config/permissions";
+import { getRolePermissions } from "../utils/permissions";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, ReactNode } from "react";
 import PermissionDenied from "./PermissionDenied";
@@ -137,7 +138,15 @@ export default function RouteProtection({
   }
 
   // Check page permission
-  const hasPermission = hasPagePermission(user.role, pathname);
+  let hasPermission = hasPagePermission(user.role, pathname);
+  
+  // If specific permissions are required, check them as well
+  if (hasPermission && requiredPermissions && requiredPermissions.length > 0) {
+    const userPermissions = getRolePermissions(user.role);
+    hasPermission = requiredPermissions.some(permission => 
+      userPermissions.includes(permission)
+    );
+  }
   
   if (!hasPermission) {
     return fallback || <PermissionDenied />;

@@ -46,9 +46,10 @@ export default function BranchManagerManagement() {
       const fetchedManagers = await branchManagerAPI.list();
       setManagers(fetchedManagers);
       setFilteredManagers(fetchedManagers);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching branch managers:', error);
-      alert(`Error fetching branch managers: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error fetching branch managers: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -97,9 +98,10 @@ export default function BranchManagerManagement() {
         await branchManagerAPI.delete(managerId);
         setManagers(managers.filter(manager => manager.id !== managerId));
         alert('Branch manager deleted successfully');
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error deleting branch manager:', error);
-        alert(`Error deleting branch manager: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Error deleting branch manager: ${errorMessage}`);
       }
     }
   };

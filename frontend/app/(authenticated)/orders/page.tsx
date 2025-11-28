@@ -55,7 +55,7 @@ interface DisplayOrder {
 
 const STATUS_META: Record<
   OrderStatus,
-  { color: string; labelKey: string; Icon: React.ComponentType<any> }
+  { color: string; labelKey: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
 > = {
   pending: { color: "bg-blue-100 text-blue-800", labelKey: "orders.status.pending", Icon: FaBoxOpen },
   processing: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.status.processing", Icon: FaClock },
@@ -66,7 +66,7 @@ const STATUS_META: Record<
 
 const PAYMENT_STATUS_META: Record<
   'pending' | 'paid' | 'unpaid' | 'failed',
-  { color: string; labelKey: string; Icon: React.ComponentType<any> }
+  { color: string; labelKey: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
 > = {
   pending: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.paymentStatus.pending", Icon: FaClock },
   paid: { color: "bg-green-100 text-green-800", labelKey: "orders.paymentStatus.paid", Icon: FaCheckCircle },
@@ -104,27 +104,27 @@ export default function OrderManagement(): JSX.Element {
 
   // Function to map backend order to display format
   const mapBackendOrderToDisplay = (backendOrder: BackendOrder): DisplayOrder => {
-    const services = backendOrder.order_items || [];
-    const items = services.map((service: any) => 
+    const services = backendOrder.services || [];
+    const items = services.map((service: { service_type: string; quantity: number }) => 
       `${service.service_type} (${service.quantity})`
     );
 
     // Safe date parsing with fallback
     let receivedDate = new Date().toISOString().split("T")[0]; // Default to today
     try {
-      if (backendOrder.order_date) {
-        const parsedDate = new Date(backendOrder.order_date);
+      if (backendOrder.created) {
+        const parsedDate = new Date(backendOrder.created);
         if (!isNaN(parsedDate.getTime())) {
           receivedDate = parsedDate.toISOString().split("T")[0];
         }
       }
     } catch (error) {
-      console.warn('Error parsing order_date:', backendOrder.order_date, error);
+      console.warn('Error parsing created date:', backendOrder.created, error);
     }
 
     return {
       id: backendOrder.order_id.toString(),
-      customerName: backendOrder.customer_name || "Unknown Customer",
+      customerName: "Customer", // User ID is available but name is not in Order interface
       customerPhone: "N/A", // Not available in current backend model
       service: services.length > 0 ? services[0].service_type : "Mixed Services",
       items,
@@ -132,9 +132,9 @@ export default function OrderManagement(): JSX.Element {
       amount: Number(backendOrder.total_amount),
       receivedDate,
       deliveryDate: backendOrder.delivery_date || undefined,
-      branchId: "1", // Branch is a string name in backend, defaulting to 1
-      branchName: backendOrder.branch.toString() || "Main Branch",
-      notes: backendOrder.description || undefined,
+      branchId: backendOrder.branch.toString(),
+      branchName: backendOrder.branch_name || "Main Branch",
+      notes: undefined, // Description not available in Order interface
       paymentMethod: backendOrder.payment_method,
       paymentStatus: backendOrder.payment_status,
     };
@@ -146,13 +146,14 @@ export default function OrderManagement(): JSX.Element {
       setIsLoading(true);
       setError(null);
       const backendOrders = await orderAPI.list({
-        ordering: '-order_date' // Get newest orders first
+        ordering: '-created' // Get newest orders first
       });
       const displayOrders = backendOrders.map(mapBackendOrderToDisplay);
       setOrders(displayOrders);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching orders:', err);
-      setError(err.message || 'Failed to fetch orders');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch orders';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -320,20 +321,23 @@ export default function OrderManagement(): JSX.Element {
           alert(`Failed to create order: ${paymentResponse.error || 'Unknown error'}`);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Order creation error:', error);
       
       // Show more specific error message
       let errorMessage = 'Failed to create order. Please try again.';
-      if (error.response?.data) {
-        if (typeof error.response.data === 'string') {
-          errorMessage = error.response.data;
-        } else if (error.response.data.detail) {
-          errorMessage = error.response.data.detail;
-        } else if (error.response.data.error) {
-          errorMessage = error.response.data.error;
+      if (error && typeof error === 'object' && 'response' in error) {
+        const errorResponse = error as { response?: { data?: unknown } };
+        if (errorResponse.response?.data) {
+          if (typeof errorResponse.response.data === 'string') {
+            errorMessage = errorResponse.response.data;
+          } else if (errorResponse.response.data && typeof errorResponse.response.data === 'object' && 'detail' in errorResponse.response.data) {
+            errorMessage = String((errorResponse.response.data as { detail?: string }).detail || errorMessage);
+          } else if (errorResponse.response.data && typeof errorResponse.response.data === 'object' && 'error' in errorResponse.response.data) {
+            errorMessage = String((errorResponse.response.data as { error?: string }).error || errorMessage);
+          }
         }
-      } else if (error.message) {
+      } else if (error instanceof Error) {
         errorMessage = error.message;
       }
       

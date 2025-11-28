@@ -103,9 +103,10 @@ const AddBranch = () => {
       await branchAPI.create(formData);
       alert("Branch created successfully!");
       router.push("/branch");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating branch:", error);
-      alert(`Error creating branch: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error creating branch: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }

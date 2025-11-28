@@ -96,10 +96,11 @@ export default function OrderPage() {
         setSelectedBranch(branchesArray[0].id);
         console.log('Auto-selected first branch:', branchesArray[0].name);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching branches:', error);
       setBranches([]);
-      setErrors([`Error fetching branches: ${error.message}`]);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setErrors([`Error fetching branches: ${errorMessage}`]);
     } finally {
       setBranchesLoading(false);
     }

@@ -136,15 +136,15 @@ export default function ConfirmationPage() {
           <div className="mb-6 p-4 border rounded-lg bg-blue-50 border-blue-200">
             <div className="flex items-center gap-3 mb-3">
               <FaClock className="text-xl text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-800">What's Next?</h3>
+              <h3 className="text-lg font-semibold text-gray-800">What&apos;s Next?</h3>
             </div>
             <div className="space-y-2 text-sm text-gray-700">
               {orderDetails.paymentMethod === 'esewa' && (
                 <>
                   <p>• Your payment has been confirmed</p>
-                  <p>• We'll contact you to confirm pickup/delivery details</p>
+                  <p>• We&apos;ll contact you to confirm pickup/delivery details</p>
                   <p>• Your order will be processed within 24 hours</p>
-                  <p>• You'll receive updates via SMS/email</p>
+                  <p>• You&apos;ll receive updates via SMS/email</p>
                 </>
               )}
               {orderDetails.paymentMethod === 'bank' && (
@@ -157,10 +157,10 @@ export default function ConfirmationPage() {
               )}
               {orderDetails.paymentMethod === 'cod' && (
                 <>
-                  <p>• We'll contact you to confirm pickup/delivery details</p>
+                  <p>• We&apos;ll contact you to confirm pickup/delivery details</p>
                   <p>• Your order will be processed within 24 hours</p>
                   <p>• Keep cash ready for payment on delivery</p>
-                  <p>• You'll receive updates via SMS/email</p>
+                  <p>• You&apos;ll receive updates via SMS/email</p>
                 </>
               )}
             </div>

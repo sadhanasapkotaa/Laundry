@@ -90,6 +90,19 @@ const Dashboard: React.FC = () => {
   const canViewAllBranches = usePermission('canViewAllBranches');
   const canViewReports = usePermission('canViewReports');
 
+  // Set up date formatting on client side (must be before early returns)
+  useEffect(() => {
+    const today = new Date();
+    const locale = i18n?.language === 'np' ? 'ne-NP' : 'en-US';
+    const formattedDate = new Intl.DateTimeFormat(locale, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(today);
+    setDateLabel(formattedDate);
+  }, [i18n?.language]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -114,19 +127,6 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
-
-  // Set up date formatting on client side
-  useEffect(() => {
-    const today = new Date();
-    const locale = i18n?.language === 'np' ? 'ne-NP' : 'en-US';
-    const formattedDate = new Intl.DateTimeFormat(locale, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).format(today);
-    setDateLabel(formattedDate);
-  }, [i18n?.language]);
 
   // Mock data with localized labels
   const dailyOrdersData: DailyOrdersItem[] = [
