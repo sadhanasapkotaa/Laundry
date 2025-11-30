@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt } from "react-icons/fa";
@@ -73,14 +73,9 @@ export default function OrderPage() {
   const [deliveryMapLink, setDeliveryMapLink] = useState("");
 
   const [errors, setErrors] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
 
-  // Fetch branches on mount
-  useEffect(() => {
-    fetchBranches();
-  }, []);
-
-  const fetchBranches = async () => {
+  const fetchBranches = useCallback(async () => {
     try {
       setBranchesLoading(true);
       console.log('Starting to fetch branches...');
@@ -104,7 +99,12 @@ export default function OrderPage() {
     } finally {
       setBranchesLoading(false);
     }
-  };
+  }, [selectedBranch]);
+
+  // Fetch branches on mount
+  useEffect(() => {
+    fetchBranches();
+  }, [fetchBranches]);
 
   const getPrice = () => {
     if (!clothName || !material) return 0;

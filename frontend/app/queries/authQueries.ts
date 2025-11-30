@@ -37,7 +37,7 @@ const authApi = {
       return response.data;
     } catch (error: unknown) {
       const errorResponse = error && typeof error === 'object' && 'response' in error 
-        ? error as { response?: { status?: number; statusText?: string; data?: unknown; headers?: unknown }; config?: { url?: string; method?: string; data?: unknown } }
+        ? error as { response?: { status?: number; statusText?: string; data?: unknown; headers?: unknown }; config?: { url?: string; method?: string; data?: unknown; headers?: unknown } }
         : null;
       console.error('Login error details:', {
         status: errorResponse?.response?.status,
@@ -192,9 +192,10 @@ export const useProfile = () => {
     queryFn: authApi.getProfile,
     enabled: !!getAccessToken(),
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: (failureCount, error) => {
+      retry: (failureCount, error) => {
       // Don't retry on 401 errors
-      if (error?.response?.status === 401) {
+      const errWithResp = error as { response?: { status?: number } } | undefined;
+      if (errWithResp?.response?.status === 401) {
         return false;
       }
       return failureCount < 3;

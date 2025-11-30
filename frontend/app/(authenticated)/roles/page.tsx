@@ -3,12 +3,12 @@
 import "../../types/i18n";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { 
-  FaUserShield, 
-  FaUsers, 
-  FaCog, 
-  FaCheck, 
-  FaTimes, 
+import {
+  FaUserShield,
+  FaUsers,
+  FaCog,
+  FaCheck,
+  FaTimes,
   FaEdit,
   FaPlus,
   FaSearch,
@@ -55,25 +55,25 @@ const RoleManagement = () => {
     // User Management
     { id: 'user_management_full', name: 'Full User Management', description: 'Create, edit, delete all users', category: 'User Management' },
     { id: 'user_management_profile', name: 'Profile Management', description: 'Edit own profile only', category: 'User Management' },
-    
+
     // Service Management
     { id: 'service_management_full', name: 'Full Service Management', description: 'Manage all services and pricing', category: 'Service Management' },
     { id: 'service_management_read', name: 'Read Service Information', description: 'View service details only', category: 'Service Management' },
-    
+
     // Order Management
     { id: 'order_management_full', name: 'Full Order Management', description: 'Manage all orders across branches', category: 'Order Management' },
     { id: 'order_management_branch', name: 'Branch Order Management', description: 'Manage orders for own branch', category: 'Order Management' },
     { id: 'order_management_delivery', name: 'Delivery Order Management', description: 'Manage delivery orders only', category: 'Order Management' },
     { id: 'order_management_own', name: 'Own Orders', description: 'View and manage own orders only', category: 'Order Management' },
-    
+
     // Branch Management
     { id: 'branch_management_full', name: 'Full Branch Management', description: 'Manage all branches', category: 'Branch Management' },
     { id: 'branch_management_own', name: 'Own Branch Management', description: 'Manage own branch only', category: 'Branch Management' },
-    
+
     // Payments
     { id: 'payments_full', name: 'Full Payment Management', description: 'Manage all payments and transactions', category: 'Payments' },
     { id: 'payments_own', name: 'Own Payments', description: 'View own payment history only', category: 'Payments' },
-    
+
     // Accounting
     { id: 'accounting_full', name: 'Full Accounting Access', description: 'Access all financial data', category: 'Accounting' },
     { id: 'accounting_branch', name: 'Branch Accounting', description: 'Access financial data for own branch', category: 'Accounting' },
@@ -140,7 +140,7 @@ const RoleManagement = () => {
 
   const getPermissionsByCategory = (rolePermissions: string[]) => {
     const categories: { [key: string]: Permission[] } = {};
-    
+
     permissions.forEach(permission => {
       if (!categories[permission.category]) {
         categories[permission.category] = [];
@@ -167,12 +167,12 @@ const RoleManagement = () => {
     }
   };
 
-  const filteredRoles = roles.filter(role => 
+  const filteredRoles = roles.filter(role =>
     role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     role.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.role.toLowerCase().includes(searchTerm.toLowerCase())
@@ -200,12 +200,11 @@ const RoleManagement = () => {
             return (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.key
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                onClick={() => setActiveTab(tab.key as 'roles' | 'permissions' | 'users')}
+                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.key
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 {tab.label}
@@ -242,9 +241,8 @@ const RoleManagement = () => {
             {filteredRoles.map(role => (
               <div
                 key={role.id}
-                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                  selectedRole === role.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
-                }`}
+                className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedRole === role.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}
                 onClick={() => setSelectedRole(role.id)}
               >
                 <div className="flex items-center justify-between">
@@ -415,9 +413,8 @@ const RoleManagement = () => {
                         {user.branchName || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
                           {user.status}
                         </span>
                       </td>

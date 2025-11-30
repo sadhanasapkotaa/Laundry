@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import "../../types/i18n";
 import { useTranslation } from 'react-i18next';
-import { 
-  FiBell, 
-  FiCheckCircle, 
-  FiXCircle, 
-  FiClock, 
-  FiUser, 
+import {
+  FiBell,
+  FiCheckCircle,
+  FiXCircle,
+  FiClock,
+  FiUser,
   FiSearch,
   FiFilter,
   FiPlus,
@@ -32,68 +32,68 @@ interface PaymentFilters {
 }
 
 // ---------- Small UI primitives ----------
-const Card: React.FC<React.PropsWithChildren<{ className?: string; onClick?: () => void }>> = ({ 
-  className = '', 
-  onClick, 
-  children 
+const Card: React.FC<React.PropsWithChildren<{ className?: string; onClick?: () => void }>> = ({
+  className = '',
+  onClick,
+  children
 }) => (
-  <div 
-    className={`rounded-2xl border border-slate-200 bg-white/70 dark:bg-slate-900/60 shadow-sm backdrop-blur ${className}`} 
+  <div
+    className={`rounded-2xl border border-slate-200 bg-white/70 dark:bg-slate-900/60 shadow-sm backdrop-blur ${className}`}
     onClick={onClick}
   >
     {children}
   </div>
 );
 
-const CardHeader: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ 
-  className = '', 
-  children 
+const CardHeader: React.FC<React.PropsWithChildren<{ className?: string }>> = ({
+  className = '',
+  children
 }) => (
   <div className={`p-5 border-b border-slate-100 dark:border-slate-800 ${className}`}>
     {children}
   </div>
 );
 
-const CardTitle: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ 
-  className = '', 
-  children 
+const CardTitle: React.FC<React.PropsWithChildren<{ className?: string }>> = ({
+  className = '',
+  children
 }) => (
   <h3 className={`text-lg font-semibold tracking-tight ${className}`}>
     {children}
   </h3>
 );
 
-const CardContent: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ 
-  className = '', 
-  children 
+const CardContent: React.FC<React.PropsWithChildren<{ className?: string }>> = ({
+  className = '',
+  children
 }) => (
   <div className={`p-5 ${className}`}>
     {children}
   </div>
 );
 
-const Badge: React.FC<React.PropsWithChildren<{ 
-  className?: string; 
+const Badge: React.FC<React.PropsWithChildren<{
+  className?: string;
   variant?: 'default' | 'success' | 'warning' | 'error' | 'info'
-}>> = ({ 
-  className = '', 
+}>> = ({
+  className = '',
   variant = 'default',
-  children 
+  children
 }) => {
-  const variantClasses = {
-    default: 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200',
-    success: 'border-green-200 bg-green-50 text-green-700',
-    warning: 'border-yellow-200 bg-yellow-50 text-yellow-700',
-    error: 'border-red-200 bg-red-50 text-red-700',
-    info: 'border-blue-200 bg-blue-50 text-blue-700',
-  };
+    const variantClasses = {
+      default: 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200',
+      success: 'border-green-200 bg-green-50 text-green-700',
+      warning: 'border-yellow-200 bg-yellow-50 text-yellow-700',
+      error: 'border-red-200 bg-red-50 text-red-700',
+      info: 'border-blue-200 bg-blue-50 text-blue-700',
+    };
 
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${variantClasses[variant]} ${className}`}>
-      {children}
-    </span>
-  );
-};
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${variantClasses[variant]} ${className}`}>
+        {children}
+      </span>
+    );
+  };
 
 // ---------- Main Component ----------
 const PaymentsPage: React.FC = () => {
@@ -107,7 +107,7 @@ const PaymentsPage: React.FC = () => {
   const [showBankModal, setShowBankModal] = useState(false);
   const [bankDetails, setBankDetails] = useState<{ account_name: string; account_number: string; bank_name: string; swift_code: string } | null>(null);
   const [transactionUuid, setTransactionUuid] = useState('');
-  
+
   const [filters, setFilters] = useState<PaymentFilters>({
     search: '',
     payment_type: '',
@@ -115,7 +115,7 @@ const PaymentsPage: React.FC = () => {
     page: 1,
     page_size: 10,
   });
-  
+
   const [pagination, setPagination] = useState({
     current_page: 1,
     total_pages: 1,
@@ -135,14 +135,14 @@ const PaymentsPage: React.FC = () => {
   // Load payment history
   const loadPaymentHistory = async (showLoader = false) => {
     if (showLoader) setLoading(true);
-    
+
     try {
       const response = await PaymentService.getPaymentHistory(filters);
-      
+
       if (response.success) {
         setPayments(response.payments);
         setPagination(response.pagination);
-        
+
         // Calculate statistics
         const stats = response.payments.reduce((acc, payment) => {
           acc.total_payments++;
@@ -156,7 +156,7 @@ const PaymentsPage: React.FC = () => {
           pending_payments: 0,
           total_amount: 0,
         });
-        
+
         setStats(stats);
       }
     } catch (error) {
@@ -186,18 +186,18 @@ const PaymentsPage: React.FC = () => {
     loadPaymentHistory();
   };
 
-  const handlePaymentInitiated = (result: { success: boolean; payment_type?: string; bank_details?: { account_name: string; account_number: string; bank_name: string; swift_code: string }; transaction_uuid?: string }) => {
+  const handlePaymentInitiated = (result: { success: boolean; payment_type?: string; bank_details?: { account_name: string; account_number: string; bank_name: string; swift_code: string }; transaction_uuid?: string; error?: string }) => {
     if (result.success) {
       if (result.payment_type === 'bank' && result.bank_details) {
         setBankDetails(result.bank_details);
-        setTransactionUuid(result.transaction_uuid);
+        setTransactionUuid(result.transaction_uuid ?? '');
         setShowBankModal(true);
       } else if (result.payment_type === 'cash') {
         // Show success message for cash payment
         alert('Cash on delivery order placed successfully!');
       }
       // eSewa payments will redirect automatically
-      
+
       setShowNewPayment(false);
       loadPaymentHistory(); // Refresh the list
     } else {
@@ -251,7 +251,7 @@ const PaymentsPage: React.FC = () => {
           <h1 className="text-3xl font-bold">{t('payments.title', 'Payments')}</h1>
           <p className="text-gray-600 mt-1">Manage your payment history and make new payments</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <button
             onClick={handleRefresh}
@@ -261,7 +261,7 @@ const PaymentsPage: React.FC = () => {
             <FiRefreshCw className={refreshing ? 'animate-spin' : ''} />
             Refresh
           </button>
-          
+
           <button
             onClick={() => setShowNewPayment(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -285,7 +285,7 @@ const PaymentsPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -297,7 +297,7 @@ const PaymentsPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -309,7 +309,7 @@ const PaymentsPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -337,7 +337,7 @@ const PaymentsPage: React.FC = () => {
                 onChange={(e) => handleFilterChange('search', e.target.value)}
               />
             </div>
-            
+
             <select
               value={filters.payment_type}
               onChange={(e) => handleFilterChange('payment_type', e.target.value)}
@@ -348,7 +348,7 @@ const PaymentsPage: React.FC = () => {
               <option value="bank">Bank Transfer</option>
               <option value="esewa">eSewa</option>
             </select>
-            
+
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -464,7 +464,7 @@ const PaymentsPage: React.FC = () => {
             {Math.min(pagination.current_page * filters.page_size, pagination.total_count)} of{' '}
             {pagination.total_count} payments
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleFilterChange('page', pagination.current_page - 1)}
@@ -473,11 +473,11 @@ const PaymentsPage: React.FC = () => {
             >
               Previous
             </button>
-            
+
             <span className="px-3 py-1">
               Page {pagination.current_page} of {pagination.total_pages}
             </span>
-            
+
             <button
               onClick={() => handleFilterChange('page', pagination.current_page + 1)}
               disabled={!pagination.has_next}
@@ -495,14 +495,14 @@ const PaymentsPage: React.FC = () => {
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Make a Payment</h3>
-              <button 
+              <button
                 onClick={() => setShowNewPayment(false)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <FiXCircle />
               </button>
             </div>
-            
+
             <PaymentMethodSelector
               amount={5000} // Default amount, you can make this configurable
               onPaymentInitiated={handlePaymentInitiated}
@@ -512,12 +512,14 @@ const PaymentsPage: React.FC = () => {
       )}
 
       {/* Bank Details Modal */}
-      <BankDetailsModal
-        isOpen={showBankModal}
-        onClose={() => setShowBankModal(false)}
-        bankDetails={bankDetails}
-        transactionUuid={transactionUuid}
-      />
+      {bankDetails && (
+        <BankDetailsModal
+          isOpen={showBankModal}
+          onClose={() => setShowBankModal(false)}
+          bankDetails={bankDetails}
+          transactionUuid={transactionUuid}
+        />
+      )}
     </div>
   );
 };

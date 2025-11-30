@@ -77,8 +77,9 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${access}`;
           return api(originalRequest);
         }
-      } catch (refreshError) {
-        // Refresh failed, clear tokens and redirect to login
+      } catch (err) {
+        // Refresh failed, log, clear tokens and redirect to login
+        console.error('Token refresh failed:', err);
         clearTokens();
         if (typeof window !== 'undefined') {
           window.location.href = '/login';

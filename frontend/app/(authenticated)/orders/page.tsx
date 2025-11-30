@@ -2,7 +2,7 @@
 "use client";
 
 import "../../types/i18n";
-import React, { JSX, useMemo, useState, useEffect } from "react";
+import React, { JSX, useMemo, useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaSearch,
@@ -30,7 +30,7 @@ import {
   Legend,
 } from "recharts";
 import PaymentService from "../../services/paymentService";
-import { orderAPI, Order as BackendOrder } from "../../services/orderService";
+import { orderAPI, Order as BackendOrder, OrderItem as OrderItemType } from "../../services/orderService";
 import { useAuth } from "../../contexts/AuthContext";
 
 type OrderStatus = "pending" | "processing" | "ready" | "delivered" | "cancelled";
@@ -76,7 +76,7 @@ const PAYMENT_STATUS_META: Record<
 
 export default function OrderManagement(): JSX.Element {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  useAuth();
 
   // UI state
   const [searchTerm, setSearchTerm] = useState("");
@@ -141,28 +141,31 @@ export default function OrderManagement(): JSX.Element {
   };
 
   // Fetch orders from backend
-  const fetchOrders = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const backendOrders = await orderAPI.list({
-        ordering: '-created' // Get newest orders first
-      });
-      const displayOrders = backendOrders.map(mapBackendOrderToDisplay);
-      setOrders(displayOrders);
-    } catch (err: unknown) {
-      console.error('Error fetching orders:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch orders';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+ const fetchOrders = useCallback(async () => {
+  try {
+    setIsLoading(true);
+    setError(null);
+    const backendOrders = await orderAPI.list({
+      ordering: "-created", // Get newest orders first
+    });
+    const displayOrders = backendOrders.map(mapBackendOrderToDisplay);
+    setOrders(displayOrders);
+  } catch (err: unknown) {
+    console.error("Error fetching orders:", err);
+    const errorMessage = err instanceof Error ? err.message : "Failed to fetch orders";
+    setError(errorMessage);
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
+
+  
+  // };
 
   // Load orders on component mount
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   // Derived data
   const filteredOrders = useMemo(() => {
@@ -244,22 +247,29 @@ export default function OrderManagement(): JSX.Element {
     setIsProcessingPayment(true);
 
     try {
-      // Prepare order data for backend API
+      // Prepare order data for backend API (match frontend CreateOrderRequest)
+      const servicesPayload: OrderItemType[] = [
+        {
+          service_type: form.service,
+          material: "unknown",
+          quantity: 1,
+          pricing_type: 'individual',
+          price_per_unit: orderAmount,
+          total_price: orderAmount,
+        },
+      ];
+
       const orderData = {
-        customer_name: form.customerName,
-        description: form.notes || '',
+        branch: Number(form.branchId || 1),
+        services: servicesPayload,
+        pickup_enabled: false,
+        delivery_enabled: false,
+        is_urgent: false,
         total_amount: orderAmount,
-        payment_method: form.paymentMethod,
-        payment_status: 'pending',
-        status: 'pending',
-        branch: form.branchName,
-        order_items: [
-          {
-            service_type: form.service,
-            quantity: 1,
-            price: orderAmount
-          }
-        ]
+        payment_method: form.paymentMethod as 'cash' | 'bank' | 'esewa',
+        payment_status: 'pending' as const,
+        status: 'pending' as const,
+        description: form.notes || ''
       };
 
       // Create order using backend API

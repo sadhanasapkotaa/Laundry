@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useAuth as useAuthQuery, useLogout } from '../queries/authQueries';
+import { ApiError } from '../types/auth';
 
 export type UserRole = 'admin' | 'branch_manager' | 'accountant' | 'rider' | 'customer';
 
@@ -22,7 +23,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  error: Error | null;
+  error: ApiError | null;
   hasRole: (role: UserRole) => boolean;
   hasAnyRole: (roles: UserRole[]) => boolean;
   logout: () => void;
