@@ -12,19 +12,19 @@ from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from .models import Role
 from django.core.exceptions import ObjectDoesNotExist
 
+
 class UserRegisterSerializer(serializers.ModelSerializer):
     """Serializer for user registration."""
     password = serializers.CharField(max_length=68, min_length=6, write_only=True)
     password2 = serializers.CharField(max_length=68, min_length=6, write_only=True)
+    role = serializers.HiddenField(default=Role.CUSTOMER)
 
     class Meta:
-        """Meta class for User registration serializer."""
         model = User
         fields = ['email', 'first_name', 'last_name', 'phone', 'password', 'password2', 'role']
-        # read_only_fields = ['role']  # Make role read-only
 
     def validate(self, attrs):
-        """Validate that  registration data."""
+        """Validate registration data."""
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError('Passwords do not match')
         return attrs
@@ -32,12 +32,14 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a new user with the validated data."""
         validated_data.pop('password2')
-        validated_data['role'] = Role.CUSTOMER
+        validated_data['role'] = Role.CUSTOMER 
+
         password = validated_data.pop('password')
         user = User(**validated_data)
         user.set_password(password)
         user.save()
         return user
+
 
 
 class UserLoginSerializer(serializers.ModelSerializer):
@@ -53,7 +55,7 @@ class UserLoginSerializer(serializers.ModelSerializer):
     class Meta:
         """Meta class for User login serializer."""
         model = User
-        fields = ['email', 'password', 'full_name', 'role', 'phone', 'access_token', 'refresh_token']
+        fields = ['email', 'password', 'full_name', 'phone', 'access_token', 'refresh_token']
 
     def validate(self, attrs):
         """Validate user credentials and return tokens."""
