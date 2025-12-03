@@ -144,6 +144,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://192.168.16.1:3000",  # Added this for your network access
+    "https://laundry-nine-sooty.vercel.app",
+
 ]
 
 CORS_ALLOW_CREDENTIALS = True
