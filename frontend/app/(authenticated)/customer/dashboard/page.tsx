@@ -4,9 +4,12 @@ import React from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 import { FiPackage, FiClock, FiUser, FiCreditCard } from "react-icons/fi";
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
+import "../../../types/i18n";
 
 export default function CustomerDashboardPage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   // Mock data - replace with actual API calls
   const stats = {
@@ -36,10 +39,10 @@ export default function CustomerDashboardPage() {
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Welcome back, {user?.first_name}!
+          {t('customer.dashboard.welcomeBack')}, {user?.first_name}!
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Here&apos;s what&apos;s happening with your laundry orders.
+          {t('customer.dashboard.whatsHappening')}
         </p>
       </div>
 
@@ -53,7 +56,7 @@ export default function CustomerDashboardPage() {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                  Active Orders
+                  {t('customer.dashboard.activeOrders')}
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   {stats.activeOrders}
@@ -71,7 +74,7 @@ export default function CustomerDashboardPage() {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                  Completed Orders
+                  {t('customer.dashboard.completedOrders')}
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   {stats.completedOrders}
@@ -89,7 +92,7 @@ export default function CustomerDashboardPage() {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                  Pending Payments
+                  {t('customer.dashboard.pendingPayments')}
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   {stats.pendingPayments}
@@ -107,7 +110,7 @@ export default function CustomerDashboardPage() {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                  Total Spent
+                  {t('customer.dashboard.totalSpent')}
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   ₨ {stats.totalSpent}
@@ -121,7 +124,7 @@ export default function CustomerDashboardPage() {
       {/* Quick Actions */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Quick Actions
+          {t('customer.dashboard.quickActions')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
@@ -130,27 +133,27 @@ export default function CustomerDashboardPage() {
           >
             <FiPackage className="h-6 w-6 text-blue-600 mr-3" />
             <span className="text-blue-700 dark:text-blue-300 font-medium">
-              Place New Order
+              {t('customer.dashboard.placeNewOrder')}
             </span>
           </Link>
-          
+
           <Link
             href="/customer/orders"
             className="flex items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
           >
             <FiClock className="h-6 w-6 text-green-600 mr-3" />
             <span className="text-green-700 dark:text-green-300 font-medium">
-              Track Orders
+              {t('customer.dashboard.trackOrders')}
             </span>
           </Link>
-          
+
           <Link
             href="/customer/payment-history"
             className="flex items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
           >
             <FiCreditCard className="h-6 w-6 text-purple-600 mr-3" />
             <span className="text-purple-700 dark:text-purple-300 font-medium">
-              Payment History
+              {t('customer.dashboard.paymentHistory')}
             </span>
           </Link>
         </div>
@@ -160,13 +163,13 @@ export default function CustomerDashboardPage() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-            Recent Orders
+            {t('customer.dashboard.recentOrders')}
           </h2>
           <Link
             href="/customer/orders"
             className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium"
           >
-            View all
+            {t('customer.dashboard.viewAll')}
           </Link>
         </div>
         <div className="space-y-3">
@@ -203,3 +206,4 @@ export default function CustomerDashboardPage() {
     </div>
   );
 }
+

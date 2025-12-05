@@ -17,11 +17,17 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     """Serializer for user registration."""
     password = serializers.CharField(max_length=68, min_length=6, write_only=True)
     password2 = serializers.CharField(max_length=68, min_length=6, write_only=True)
-    role = serializers.HiddenField(default=Role.CUSTOMER)
 
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'phone', 'password', 'password2', 'role']
+        fields = ['email', 'first_name', 'last_name', 'phone', 'password', 'password2']
+        extra_kwargs = {
+            'email': {
+                'error_messages': {
+                    'unique': 'Email already exists.'
+                }
+            }
+        }
 
     def validate(self, attrs):
         """Validate registration data."""
@@ -31,8 +37,11 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create a new user with the validated data."""
+        # Remove password2 as it's only for validation
         validated_data.pop('password2')
-        validated_data['role'] = Role.CUSTOMER 
+        
+        # Ensure role is set to customer (use string value, not enum)
+        validated_data['role'] = Role.CUSTOMER.value  # 'customer' string
 
         password = validated_data.pop('password')
         user = User(**validated_data)
@@ -42,7 +51,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
 
 
-class UserLoginSerializer(serializers.ModelSerializer):
+class UserLoginSerializer(serializers.Serializer):
     """Serializer for user login."""
     email = serializers.EmailField(max_length=255, min_length=3)
     password = serializers.CharField(max_length=68, min_length=6, write_only=True)
@@ -51,11 +60,6 @@ class UserLoginSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(max_length=20, read_only=True)
     access_token = serializers.CharField(max_length=255, read_only=True)
     refresh_token = serializers.CharField(max_length=255, read_only=True)
-
-    class Meta:
-        """Meta class for User login serializer."""
-        model = User
-        fields = ['email', 'password', 'full_name', 'phone', 'access_token', 'refresh_token']
 
     def validate(self, attrs):
         """Validate user credentials and return tokens."""
@@ -79,8 +83,6 @@ class UserLoginSerializer(serializers.ModelSerializer):
             'access_token': str(user_tokens.get('access')),
             'refresh_token': str(user_tokens.get('refresh'))
         }
-
-        # return super().validate(attrs)
 
 class PasswordResetSerializer(serializers.ModelSerializer):
     """Serializer for password reset requests."""

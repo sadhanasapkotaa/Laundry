@@ -36,7 +36,7 @@ const authApi = {
       console.log('Login response:', response.data);
       return response.data;
     } catch (error: unknown) {
-      const errorResponse = error && typeof error === 'object' && 'response' in error 
+      const errorResponse = error && typeof error === 'object' && 'response' in error
         ? error as { response?: { status?: number; statusText?: string; data?: unknown; headers?: unknown }; config?: { url?: string; method?: string; data?: unknown; headers?: unknown } }
         : null;
       console.error('Login error details:', {
@@ -56,8 +56,34 @@ const authApi = {
   },
 
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {
-    const response = await api.post('/auth/register/', data);
-    return response.data;
+    console.log('Register request data:', data);
+    console.log('API base URL:', api.defaults.baseURL);
+    try {
+      const response = await api.post('/auth/register/', data);
+      console.log('Register response:', response.data);
+      return response.data;
+    } catch (error: unknown) {
+      const errorResponse = error && typeof error === 'object' && 'response' in error
+        ? error as { response?: { status?: number; statusText?: string; data?: unknown; headers?: unknown }; config?: { url?: string; method?: string; data?: unknown; headers?: unknown } }
+        : null;
+
+      // Log the actual error data as a string so we can see it
+      console.error('Backend error data:', JSON.stringify(errorResponse?.response?.data, null, 2));
+
+      console.error('Registration error details:', {
+        status: errorResponse?.response?.status,
+        statusText: errorResponse?.response?.statusText,
+        data: errorResponse?.response?.data,
+        headers: errorResponse?.response?.headers,
+        config: {
+          url: errorResponse?.config?.url,
+          method: errorResponse?.config?.method,
+          data: errorResponse?.config?.data,
+          headers: errorResponse?.config?.headers,
+        }
+      });
+      throw error instanceof Error ? error : new Error('Registration failed');
+    }
   },
 
   verifyOTP: async (data: VerifyOTPRequest): Promise<VerifyOTPResponse> => {
@@ -106,7 +132,7 @@ export const useLogin = () => {
     onSuccess: (data) => {
       // Store tokens
       setTokens(data.access_token, data.refresh_token);
-      
+
       // Create user object from login response
       const user: User = {
         id: '', // We'll get this from profile endpoint
@@ -120,10 +146,10 @@ export const useLogin = () => {
         date_joined: new Date().toISOString(),
         last_login: new Date().toISOString(),
       };
-      
+
       // Update user cache
       queryClient.setQueryData(authKeys.user(), user);
-      
+
       // Invalidate auth queries to fetch fresh profile data
       queryClient.invalidateQueries({ queryKey: authKeys.all });
     },
@@ -192,7 +218,7 @@ export const useProfile = () => {
     queryFn: authApi.getProfile,
     enabled: !!getAccessToken(),
     staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: (failureCount, error) => {
+    retry: (failureCount, error) => {
       // Don't retry on 401 errors
       const errWithResp = error as { response?: { status?: number } } | undefined;
       if (errWithResp?.response?.status === 401) {
@@ -211,10 +237,10 @@ export const useLogout = () => {
     onSuccess: () => {
       // Clear tokens
       clearTokens();
-      
+
       // Clear all cached data
       queryClient.clear();
-      
+
       // Redirect to login
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
@@ -222,11 +248,11 @@ export const useLogout = () => {
     },
     onError: (error) => {
       console.error('Logout error:', error);
-      
+
       // Clear tokens even if logout fails
       clearTokens();
       queryClient.clear();
-      
+
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -256,7 +282,7 @@ export const useUpdateProfile = () => {
       // Update user cache with new data
       queryClient.setQueryData(authKeys.user(), data.data);
       queryClient.setQueryData(authKeys.profile(), data.data);
-      
+
       // Invalidate auth queries
       queryClient.invalidateQueries({ queryKey: authKeys.all });
     },

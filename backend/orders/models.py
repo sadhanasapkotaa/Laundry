@@ -15,9 +15,9 @@ class Order(models.Model):
     delivery_enabled = models.BooleanField(default=False)
     delivery_date = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=[
-        ('asked pickup', 'Asked for Pickup'),
+        ('pending pickup', 'Pending Pickup'),
         ('pending', 'Pending'),
-        ('in_progress', 'In Progress'),
+        ('in progress', 'In Progress'),
         ('to be delivered', 'To Be Delivered'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled')
@@ -87,3 +87,21 @@ class Delivery(models.Model):
 
     def __str__(self):
         return f"({self.delivery_type} - Status: {self.status})"
+
+
+class UserAddress(models.Model):
+    """Model to store user addresses for pickup and delivery."""
+    ADDRESS_TYPES = (
+        ('pickup', 'Pickup'),
+        ('delivery', 'Delivery'),
+        ('both', 'Both'),
+    )
+
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='addresses')
+    address = models.CharField(max_length=255)
+    map_link = models.URLField(blank=True, null=True)
+    address_type = models.CharField(max_length=10, choices=ADDRESS_TYPES, default='both')
+    is_default = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.address} ({self.address_type})"

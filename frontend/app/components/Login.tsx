@@ -38,8 +38,8 @@ const Login = () => {
                 const redirectPath = '/dashboard';
                 console.log('Redirecting to dashboard:', redirectPath);
 
-                // Use replace instead of push to prevent going back to login page
-                router.replace(redirectPath);
+                // Use window.location.href for a hard redirect to ensure state is fresh
+                window.location.href = redirectPath;
             },
             onError: (error) => {
                 console.error('Login failed:', error);

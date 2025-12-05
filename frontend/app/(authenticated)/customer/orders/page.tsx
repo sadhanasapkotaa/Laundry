@@ -1,61 +1,66 @@
 
 "use client";
 
-// This is the page that only tracks the orders of the curent customer filtered by customer id
+// This is the page that only tracks the orders of the current customer filtered by customer id
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 import { FiPackage, FiClock, FiCheck, FiTruck } from "react-icons/fi";
-
+import { useTranslation } from "react-i18next";
+import "../../../types/i18n";
+import { orderAPI, Order } from "../../../services/orderService";
+import Link from "next/link";
 
 export default function CustomerOrdersPage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
-  // Mock orders data - replace with actual API call
-  const orders = [
-    {
-      id: "ORD-001",
-      date: "2024-12-20",
-      status: "processing",
-      items: [
-        { name: "Shirts", quantity: 3, price: 50 },
-        { name: "Pants", quantity: 2, price: 100 },
-      ],
-      total: 450,
-      pickupDate: "2024-12-21",
-      deliveryDate: "2024-12-23",
-      branch: "Kathmandu Main Branch",
-      deliveryTime: "2:00 PM - 4:00 PM",
-      notes: "Please handle with care."
-    },
-    {
-      id: "ORD-002",
-      date: "2024-12-18",
-      status: "completed",
-      items: [
-        { name: "Dress", quantity: 1, price: 300 },
-        { name: "Jacket", quantity: 1, price: 350 },
-      ],
-      total: 650,
-      pickupDate: "2024-12-19",
-      deliveryDate: "2024-12-21",
-      branch: "Lalitpur Branch",
-      deliveryTime: "11:00 AM - 1:00 PM",
-      notes: "Delivered to security guard."
-    }
-  ];
+  // Real orders from API
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // State to track which order is expanded
-  const [expandedOrderId, setExpandedOrderId] = React.useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  // Fetch orders on component mount
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const fetchedOrders = await orderAPI.list({ ordering: '-created' });
+        setOrders(fetchedOrders);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+        setError('Failed to load orders. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchOrders();
+    }
+  }, [user]);
 
   const handleToggleDetails = (orderId: string) => {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        <FiPackage className="mx-auto h-8 w-8 animate-pulse mb-2" />
+        {t('common.loading')}
+      </div>
+    );
+  }
+
   // Prevent hydration mismatch by not rendering until user is loaded on client
   if (typeof window !== 'undefined' && !user) {
-    // You can show a loading spinner or nothing
-    return <div className="p-8 text-center text-gray-500">Loading...</div>;
+    return <div className="p-8 text-center text-gray-500">{t('common.loading')}</div>;
   }
 
   const getStatusIcon = (status: string) => {
@@ -66,6 +71,7 @@ export default function CustomerOrdersPage() {
         return <FiPackage className="text-blue-500" />;
       case "ready":
         return <FiCheck className="text-green-500" />;
+      case "delivered":
       case "out_for_delivery":
         return <FiTruck className="text-purple-500" />;
       case "completed":
@@ -78,18 +84,24 @@ export default function CustomerOrdersPage() {
   const getStatusText = (status: string) => {
     switch (status) {
       case "pending":
-        return "Pending Pickup";
+        return t('customer.orders.status.pending');
       case "processing":
-        return "In Process";
+        return t('customer.orders.status.processing');
       case "ready":
-        return "Ready for Delivery";
+        return t('customer.orders.status.ready');
+      case "delivered":
       case "out_for_delivery":
-        return "Out for Delivery";
+        return t('customer.orders.status.outForDelivery');
       case "completed":
-        return "Completed";
+        return t('customer.orders.status.completed');
       default:
         return status;
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString();
   };
 
   return (
@@ -97,24 +109,31 @@ export default function CustomerOrdersPage() {
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          My Orders
+          {t('customer.orders.title')}
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
           {user ? (
-            <>Welcome back, {user.first_name}! Track your laundry orders here.</>
+            <>{t('customer.orders.welcomeBack')}, {user.first_name}! {t('customer.orders.trackOrders')}</>
           ) : (
-            <>Track your laundry orders here.</>
+            <>{t('customer.orders.trackOrders')}</>
           )}
         </p>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
       {/* Orders List */}
       <div className="space-y-4">
         {orders.map((order) => {
-          const isExpanded = expandedOrderId === order.id;
+          const isExpanded = expandedOrderId === order.order_id;
           return (
             <div
-              key={order.id}
+              key={order.id || order.order_id}
               className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6"
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -122,7 +141,7 @@ export default function CustomerOrdersPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {order.id}
+                      {order.order_id}
                     </h3>
                     <div className="flex items-center gap-2">
                       {getStatusIcon(order.status)}
@@ -134,52 +153,83 @@ export default function CustomerOrdersPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400">
                     <div>
-                      <span className="font-medium">Order Date:</span> {order.date}
+                      <span className="font-medium">{t('customer.orders.orderDate')}:</span> {formatDate(order.created)}
                     </div>
-                    <div>
-                      <span className="font-medium">Pickup:</span> {order.pickupDate}
-                    </div>
-                    <div>
-                      <span className="font-medium">Delivery:</span> {order.deliveryDate}
-                    </div>
+                    {order.pickup_enabled && order.pickup_date && (
+                      <div>
+                        <span className="font-medium">{t('customer.orders.pickup')}:</span> {formatDate(order.pickup_date)}
+                      </div>
+                    )}
+                    {order.delivery_enabled && order.delivery_date && (
+                      <div>
+                        <span className="font-medium">{t('customer.orders.delivery')}:</span> {formatDate(order.delivery_date)}
+                      </div>
+                    )}
                   </div>
 
                   {isExpanded && (
                     <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
                       <div className="mb-2">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Branch:</span>
-                        <span className="ml-2 text-gray-600 dark:text-gray-400">{order.branch}</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{t('customer.orders.branch')}:</span>
+                        <span className="ml-2 text-gray-600 dark:text-gray-400">{order.branch_name}</span>
                       </div>
+                      {order.delivery_enabled && order.delivery_time && (
+                        <div className="mb-2">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{t('customer.orders.deliveryTime')}:</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-400">{order.delivery_time}</span>
+                        </div>
+                      )}
+                      {order.pickup_address && (
+                        <div className="mb-2">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">Pickup Address:</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-400">{order.pickup_address}</span>
+                        </div>
+                      )}
+                      {order.delivery_address && (
+                        <div className="mb-2">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">Delivery Address:</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-400">{order.delivery_address}</span>
+                        </div>
+                      )}
                       <div className="mb-2">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Delivery Time:</span>
-                        <span className="ml-2 text-gray-600 dark:text-gray-400">{order.deliveryTime}</span>
-                      </div>
-                      <div className="mb-2">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Order Notes:</span>
-                        <span className="ml-2 text-gray-600 dark:text-gray-400">{order.notes}</span>
-                      </div>
-                      <div className="mb-2">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Items:</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{t('customer.orders.items')}:</span>
                         <table className="min-w-full mt-2 text-sm">
                           <thead>
                             <tr className="text-left text-gray-500">
-                              <th className="pr-4">Item</th>
-                              <th className="pr-4">Qty</th>
-                              <th className="pr-4">Unit Price</th>
-                              <th className="pr-4">Total</th>
+                              <th className="pr-4">{t('customer.orders.item')}</th>
+                              <th className="pr-4">{t('customer.orders.qty')}</th>
+                              <th className="pr-4">{t('customer.orders.unitPrice')}</th>
+                              <th className="pr-4">{t('customer.orders.total')}</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {order.items.map((item, idx) => (
+                            {(order.services || []).map((item, idx) => (
                               <tr key={idx}>
-                                <td className="pr-4">{item.name}</td>
+                                <td className="pr-4 capitalize">{item.service_type} ({item.material})</td>
                                 <td className="pr-4">{item.quantity}</td>
-                                <td className="pr-4">₨ {item.price}</td>
-                                <td className="pr-4">₨ {item.price * item.quantity}</td>
+                                <td className="pr-4">₨ {item.price_per_unit}</td>
+                                <td className="pr-4">₨ {item.total_price}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex justify-between text-sm">
+                          <span>Payment Method:</span>
+                          <span className="capitalize">{order.payment_method}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Payment Status:</span>
+                          <span className={`capitalize ${order.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {order.payment_status}
+                          </span>
+                        </div>
+                        {order.is_urgent && (
+                          <div className="mt-2 text-orange-600 font-medium">
+                            ⚡ Urgent Service
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -188,13 +238,13 @@ export default function CustomerOrdersPage() {
                 {/* Order Total */}
                 <div className="text-right">
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    ₨ {order.total}
+                    ₨ {order.total_amount}
                   </div>
                   <button
                     className="mt-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    onClick={() => handleToggleDetails(order.id)}
+                    onClick={() => handleToggleDetails(order.order_id)}
                   >
-                    {isExpanded ? "Hide Details" : "View Details"}
+                    {isExpanded ? t('customer.orders.hideDetails') : t('customer.orders.viewDetails')}
                   </button>
                 </div>
               </div>
@@ -204,18 +254,21 @@ export default function CustomerOrdersPage() {
       </div>
 
       {/* Empty State */}
-      {orders.length === 0 && (
+      {orders.length === 0 && !loading && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-12 text-center">
           <FiPackage className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-            No orders yet
+            {t('customer.orders.noOrdersYet')}
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            When you place your first order, it will appear here.
+            {t('customer.orders.noOrdersMessage')}
           </p>
-          <button className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-            Place New Order
-          </button>
+          <Link
+            href="/customer/place-order"
+            className="mt-4 inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            {t('customer.orders.placeNewOrder')}
+          </Link>
         </div>
       )}
     </div>

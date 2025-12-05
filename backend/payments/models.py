@@ -35,8 +35,23 @@ class Payment(models.Model):
     transaction_code = models.CharField(max_length=50, blank=True, null=True)
     ref_id = models.CharField(max_length=50, blank=True, null=True)
     order_data = models.JSONField(blank=True, null=True, help_text="Order data to create order after payment")
+    # Idempotency fields
+    idempotency_key = models.CharField(max_length=100, blank=True, null=True, db_index=True,
+                                       help_text="Unique key to prevent duplicate payment initiations")
+    processed_at = models.DateTimeField(blank=True, null=True,
+                                        help_text="Timestamp when payment was fully processed")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        # Ensure idempotency_key is unique per user
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'idempotency_key'],
+                name='unique_user_idempotency_key',
+                condition=models.Q(idempotency_key__isnull=False)
+            )
+        ]
 
     def __str__(self):
         return f"Payment {self.transaction_uuid} - Rs.{self.total_amount}"

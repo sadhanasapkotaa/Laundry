@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // API base configuration
-const API_BASE_URL = 'https://laundry-6qcm.onrender.com/api';
+// Use localhost for local development, or set via environment variable
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 // Create axios instance
 export const api = axios.create({

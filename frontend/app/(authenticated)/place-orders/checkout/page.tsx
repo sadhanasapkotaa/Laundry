@@ -55,13 +55,16 @@ interface OrderData {
 export default function CheckoutPage() {
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<"esewa" | "bank" | "cod" | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderNotes, setOrderNotes] = useState("");
 
   useEffect(() => {
+    // Check for eSewa payment return first (before loading order data)
+    checkEsewaReturn();
+
     // Load order data from localStorage
     const storedOrderData = localStorage.getItem('orderData');
     if (storedOrderData) {
@@ -73,41 +76,65 @@ export default function CheckoutPage() {
         router.push('/place-orders');
       }
     } else {
-      // No order data, redirect back to order page
-      router.push('/place-orders');
+      // No order data and no eSewa callback, redirect back to order page
+      const urlParams = new URLSearchParams(window.location.search);
+      if (!urlParams.get('data')) {
+        router.push('/place-orders');
+      }
     }
-
-    // Check for eSewa payment return
-    checkEsewaReturn();
   }, [router]);
 
   const checkEsewaReturn = () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const oid = urlParams.get('oid');
-    const amt = urlParams.get('amt');
-    const refId = urlParams.get('refId');
-    
-    // Check for failure parameters
+
+    // Check for failure parameters first
     const failureReason = urlParams.get('failure_reason') || urlParams.get('error');
-    
+
     if (failureReason) {
       // Payment failed
-      router.push(`/place-orders/failure?reason=eSewa payment failed: ${failureReason}&orderId=${oid || ''}`);
+      router.push(`/place-orders/failure?reason=eSewa payment failed: ${failureReason}`);
       return;
     }
-    
-    if (oid && amt && refId) {
-      // eSewa payment successful
-      handleEsewaSuccess(oid, refId, parseFloat(amt));
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+
+    // eSewa returns a base64-encoded 'data' parameter with payment info
+    const dataParam = urlParams.get('data');
+
+    if (dataParam) {
+      try {
+        // Decode base64 data
+        const decodedData = atob(dataParam);
+        const paymentData = JSON.parse(decodedData);
+
+        console.log('eSewa payment callback data:', paymentData);
+
+        // Extract values from the decoded data
+        const {
+          transaction_code,
+          status,
+          total_amount,
+          transaction_uuid,
+        } = paymentData;
+
+        if (status === 'COMPLETE') {
+          // Payment successful - use transaction_code as refId
+          handleEsewaSuccess(transaction_uuid, transaction_code, parseFloat(total_amount));
+          // Clean URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          // Payment not complete
+          router.push(`/place-orders/failure?reason=eSewa payment status: ${status}`);
+        }
+      } catch (error) {
+        console.error('Error parsing eSewa payment data:', error);
+        router.push(`/place-orders/failure?reason=Failed to parse payment response`);
+      }
     }
   };
 
-  const handleEsewaSuccess = async (orderId: string, refId: string, amount: number) => {
+  const handleEsewaSuccess = async (transactionUuid: string, transactionCode: string, amount: number) => {
     try {
       setIsProcessing(true);
-      
+
       // First verify the payment with backend
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
       const verificationResponse = await fetch(`${API_BASE}/payments/verify-esewa/`, {
@@ -116,33 +143,33 @@ export default function CheckoutPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          oid: orderId,
-          amt: amount.toString(),
-          refId: refId,
+          transaction_uuid: transactionUuid,
+          transaction_code: transactionCode,
+          amount: amount.toString(),
         }),
       });
 
       const verificationResult = await verificationResponse.json();
-      
+
       if (!verificationResult.success) {
         throw new Error(verificationResult.error || 'Payment verification failed');
       }
-      
+
       const storedOrderData = localStorage.getItem('orderData');
       if (!storedOrderData) {
         throw new Error('Order data not found');
       }
-      
-      const orderData = JSON.parse(storedOrderData);
-      
+
+      const orderDataParsed = JSON.parse(storedOrderData);
+
       // Create order with paid status
-      const order = await createOrder(orderData, 'esewa', 'paid', orderId);
-      
+      const order = await createOrder(orderDataParsed, 'esewa', 'paid', transactionCode);
+
       // Clear localStorage
       localStorage.removeItem('orderData');
-      
+
       // Navigate to confirmation
-      router.push(`/place-orders/confirmation?orderId=${order.id}&paymentMethod=esewa&paymentRef=${refId}&amount=${amount}`);
+      router.push(`/place-orders/confirmation?orderId=${order.id}&paymentMethod=esewa&paymentRef=${transactionCode}&amount=${amount}`);
     } catch (error) {
       console.error('Error processing eSewa success:', error);
       router.push(`/place-orders/failure?reason=Payment processing failed: ${error}`);
@@ -192,9 +219,9 @@ export default function CheckoutPage() {
 
   const handlePaymentSelection = async (method: "esewa" | "bank" | "cod") => {
     if (!orderData) return;
-    
+
     setSelectedPayment(method);
-    
+
     if (method === "esewa") {
       await handleEsewaPayment();
     } else if (method === "bank") {
@@ -206,10 +233,10 @@ export default function CheckoutPage() {
 
   const handleEsewaPayment = async () => {
     if (!orderData) return;
-    
+
     try {
       setIsProcessing(true);
-      
+
       const paymentResponse = await PaymentService.initiatePayment({
         payment_type: "esewa",
         amount: orderData.pricing.total,
@@ -219,7 +246,7 @@ export default function CheckoutPage() {
       if (paymentResponse.success && paymentResponse.payment_data && paymentResponse.esewa_url) {
         // Store order data before redirect
         localStorage.setItem('orderData', JSON.stringify(orderData));
-        
+
         // Redirect to eSewa
         PaymentService.submitEsewaPayment(paymentResponse.payment_data, paymentResponse.esewa_url);
       } else {
@@ -236,16 +263,16 @@ export default function CheckoutPage() {
 
   const handleBankPayment = async () => {
     if (!orderData) return;
-    
+
     try {
       setIsProcessing(true);
-      
+
       // Create order with pending payment status
       const order = await createOrder(orderData, 'bank', 'pending');
-      
+
       // Clear localStorage
       localStorage.removeItem('orderData');
-      
+
       // Show bank details and navigate to confirmation
       alert(`Order created successfully! Please transfer Rs. ${orderData.pricing.total} to our bank account:
 
@@ -256,7 +283,7 @@ SWIFT: SAMPLEBNK
 
 Your order will be processed after payment confirmation.
 Order ID: ${order.id}`);
-      
+
       router.push(`/place-orders/confirmation?orderId=${order.id}&paymentMethod=bank`);
     } catch (error) {
       console.error('Bank payment error:', error);
@@ -269,16 +296,16 @@ Order ID: ${order.id}`);
 
   const handleCODPayment = async () => {
     if (!orderData) return;
-    
+
     try {
       setIsProcessing(true);
-      
+
       // Create order with pending payment status
       const order = await createOrder(orderData, 'cod', 'pending');
-      
+
       // Clear localStorage
       localStorage.removeItem('orderData');
-      
+
       // Navigate to confirmation
       router.push(`/place-orders/confirmation?orderId=${order.id}&paymentMethod=cod`);
     } catch (error) {
@@ -312,8 +339,8 @@ Order ID: ${order.id}`);
         <div className="lg:col-span-2">
           <div className="bg-white shadow rounded p-6">
             <div className="flex items-center gap-3 mb-6">
-              <button 
-                onClick={goBack} 
+              <button
+                onClick={goBack}
                 className="text-gray-600 hover:text-gray-800"
                 disabled={isProcessing}
               >
@@ -377,7 +404,7 @@ Order ID: ${order.id}`);
                       <p className="text-sm text-green-700">Cost: Rs. {orderData.pricing.pickupCost}</p>
                     </div>
                   )}
-                  
+
                   {orderData.services.deliveryEnabled && orderData.delivery && (
                     <div className="border rounded-lg p-4 bg-blue-50">
                       <h4 className="font-medium text-blue-800">Delivery Service</h4>
@@ -388,7 +415,7 @@ Order ID: ${order.id}`);
                       <p className="text-sm text-blue-700">Cost: Rs. {orderData.pricing.deliveryCost}</p>
                     </div>
                   )}
-                  
+
                   {orderData.services.isUrgent && (
                     <div className="border rounded-lg p-4 bg-orange-50">
                       <h4 className="font-medium text-orange-800">Urgent Service</h4>
@@ -453,7 +480,7 @@ Order ID: ${order.id}`);
             {/* Payment Methods */}
             <div className="mb-6">
               <h2 className="text-lg font-semibold mb-4">Payment Method</h2>
-              
+
               {/* Information about payment */}
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
@@ -471,11 +498,10 @@ Order ID: ${order.id}`);
                 <button
                   onClick={() => handlePaymentSelection("esewa")}
                   disabled={isProcessing}
-                  className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                    selectedPayment === "esewa"
-                      ? "border-purple-500 bg-purple-50"
-                      : "border-gray-200 hover:border-purple-300"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`w-full p-4 border rounded-lg text-left transition-colors ${selectedPayment === "esewa"
+                    ? "border-purple-500 bg-purple-50"
+                    : "border-gray-200 hover:border-purple-300"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -494,11 +520,10 @@ Order ID: ${order.id}`);
                 <button
                   onClick={() => handlePaymentSelection("bank")}
                   disabled={isProcessing}
-                  className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                    selectedPayment === "bank"
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-blue-300"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`w-full p-4 border rounded-lg text-left transition-colors ${selectedPayment === "bank"
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-blue-300"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -517,11 +542,10 @@ Order ID: ${order.id}`);
                 <button
                   onClick={() => handlePaymentSelection("cod")}
                   disabled={isProcessing}
-                  className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                    selectedPayment === "cod"
-                      ? "border-green-500 bg-green-50"
-                      : "border-gray-200 hover:border-green-300"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`w-full p-4 border rounded-lg text-left transition-colors ${selectedPayment === "cod"
+                    ? "border-green-500 bg-green-50"
+                    : "border-gray-200 hover:border-green-300"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div className="flex items-center justify-between">
                     <div>

@@ -2,7 +2,7 @@ const np = {
   "auth": {
     "login": "लगइन",
     "email": "इमेल",
-    "password": "पासवर्ड", 
+    "password": "पासवर्ड",
     "loginButton": "साइन इन",
     "logout": "लगआउट",
     "welcome": "लन्ड्री व्यवस्थापन प्रणालीमा स्वागत छ",
@@ -39,7 +39,7 @@ const np = {
     "recentActivityDesc": "नवीनतम प्रणाली गतिविधिहरू",
     "days": {
       "mon": "सोम",
-      "tue": "मंगल", 
+      "tue": "मंगल",
       "wed": "बुध",
       "thu": "बिहि",
       "fri": "शुक्र",
@@ -103,7 +103,7 @@ const np = {
     "route": "मार्ग",
     "timeSlot": "समय स्लट",
     "morning": "बिहान (८ बजे - १२ बजे)",
-    "afternoon": "दिउँसो (१२ बजे - ५ बजे)", 
+    "afternoon": "दिउँसो (१२ बजे - ५ बजे)",
     "evening": "साँझ (५ बजे - ८ बजे)",
     "deliveryStatus": "डेलिभरी स्थिति",
     "optimizeRoute": "मार्ग अनुकूलन गर्नुहोस्",
@@ -188,7 +188,7 @@ const np = {
   "clients": {
     "title": "ग्राहक व्यवस्थापन",
     "addClient": "ग्राहक थप्नुहोस्",
-    "clientDetails": "ग्राहक विवरण", 
+    "clientDetails": "ग्राहक विवरण",
     "contactHistory": "सम्पर्क इतिहास",
     "orderHistory": "अर्डर इतिहास",
     "loyaltyPoints": "लयालटी पोइन्ट"
@@ -288,7 +288,7 @@ const np = {
     "selectDateRange": "मिति दायरा चयन गर्नुहोस्",
     "format": "ढाँचा",
     "csv": "CSV",
-    "excel": "Excel", 
+    "excel": "Excel",
     "pdf": "PDF"
   },
   "common": {
@@ -296,7 +296,7 @@ const np = {
     "filter": "फिल्टर",
     "export": "निर्यात",
     "date": "मिति",
-    "amount": "रकम", 
+    "amount": "रकम",
     "status": "स्थिति",
     "actions": "कार्यहरू",
     "name": "नाम",
@@ -332,6 +332,99 @@ const np = {
     "profile": "प्रोफाइल",
     "help": "सहायता",
     "logout": "लगआउट"
+  },
+  "customer": {
+    "dashboard": {
+      "welcomeBack": "स्वागत छ",
+      "whatsHappening": "तपाईंको लुगा धुने अर्डरहरूको अवस्था यस्तो छ।",
+      "activeOrders": "सक्रिय अर्डरहरू",
+      "completedOrders": "पूरा भएका अर्डरहरू",
+      "pendingPayments": "बाँकी भुक्तानीहरू",
+      "totalSpent": "कुल खर्च",
+      "quickActions": "द्रुत कार्यहरू",
+      "placeNewOrder": "नयाँ अर्डर राख्नुहोस्",
+      "trackOrders": "अर्डर ट्र्याक गर्नुहोस्",
+      "paymentHistory": "भुक्तानी इतिहास",
+      "recentOrders": "हालका अर्डरहरू",
+      "viewAll": "सबै हेर्नुहोस्"
+    },
+    "orders": {
+      "title": "मेरा अर्डरहरू",
+      "welcomeBack": "स्वागत छ",
+      "trackOrders": "तपाईंको लुगा धुने अर्डरहरू यहाँ ट्र्याक गर्नुहोस्।",
+      "orderDate": "अर्डर मिति",
+      "pickup": "पिकअप",
+      "delivery": "डेलिभरी",
+      "branch": "शाखा",
+      "deliveryTime": "डेलिभरी समय",
+      "orderNotes": "अर्डर नोटहरू",
+      "items": "वस्तुहरू",
+      "item": "वस्तु",
+      "qty": "मात्रा",
+      "unitPrice": "एकाई मूल्य",
+      "total": "कुल",
+      "viewDetails": "विवरण हेर्नुहोस्",
+      "hideDetails": "विवरण लुकाउनुहोस्",
+      "noOrdersYet": "अहिलेसम्म कुनै अर्डर छैन",
+      "noOrdersMessage": "तपाईंले पहिलो अर्डर राख्दा यहाँ देखिनेछ।",
+      "placeNewOrder": "नयाँ अर्डर राख्नुहोस्",
+      "status": {
+        "pending": "पिकअप बाँकी",
+        "processing": "प्रक्रियामा",
+        "ready": "डेलिभरीको लागि तयार",
+        "outForDelivery": "डेलिभरीमा",
+        "completed": "पूरा भयो"
+      }
+    },
+    "paymentHistory": {
+      "title": "भुक्तानी इतिहास",
+      "paymentId": "भुक्तानी आईडी",
+      "orderId": "अर्डर आईडी",
+      "date": "मिति",
+      "amount": "रकम",
+      "method": "विधि",
+      "status": "स्थिति",
+      "noPayments": "कुनै भुक्तानी इतिहास फेला परेन।"
+    },
+    "placeOrder": {
+      "title": "नयाँ अर्डर राख्नुहोस्",
+      "orderSuccess": "अर्डर सफलतापूर्वक राखियो!",
+      "service": "सेवा",
+      "selectService": "सेवा छान्नुहोस्",
+      "branch": "शाखा",
+      "selectBranch": "शाखा छान्नुहोस्",
+      "requestPickup": "पिकअप अनुरोध गर्नुहोस्",
+      "requestDelivery": "डेलिभरी अनुरोध गर्नुहोस्",
+      "description": "विवरण (वैकल्पिक)",
+      "descriptionPlaceholder": "तपाईंको अर्डर, विशेष निर्देशनहरू आदि वर्णन गर्नुहोस्।",
+      "placeOrder": "अर्डर राख्नुहोस्",
+      "placingOrder": "अर्डर राख्दै..."
+    },
+    "profile": {
+      "title": "मेरो प्रोफाइल",
+      "fullName": "पूरा नाम",
+      "firstName": "पहिलो नाम",
+      "lastName": "थर",
+      "email": "इमेल",
+      "phone": "फोन",
+      "phoneNumber": "फोन नम्बर",
+      "editProfile": "प्रोफाइल सम्पादन गर्नुहोस्",
+      "changePassword": "पासवर्ड परिवर्तन गर्नुहोस्",
+      "save": "सेभ गर्नुहोस्",
+      "saving": "सेभ हुँदैछ...",
+      "cancel": "रद्द गर्नुहोस्",
+      "loading": "लोड हुँदैछ...",
+      "updateFailed": "प्रोफाइल अपडेट गर्न असफल भयो। कृपया पुन: प्रयास गर्नुहोस्।",
+      "passwordModal": {
+        "title": "पासवर्ड परिवर्तन गर्नुहोस्",
+        "subtitle": "बलियो पासवर्डले तपाईंको खाता सुरक्षित राख्नुहोस्!",
+        "currentPassword": "हालको पासवर्ड",
+        "newPassword": "नयाँ पासवर्ड",
+        "confirmPassword": "नयाँ पासवर्ड पुष्टि गर्नुहोस्",
+        "changeButton": "पासवर्ड परिवर्तन गर्नुहोस्",
+        "cancelButton": "रद्द गर्नुहोस्"
+      }
+    }
   }
 };
 

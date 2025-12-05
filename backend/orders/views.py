@@ -1,23 +1,33 @@
 """This file contains views for handling orders and deliveries in the laundry management system."""
-from rest_framework import generics
+from rest_framework import generics, viewsets
 from rest_framework.permissions import IsAuthenticated
-from .models import Order, Delivery
-from .serializers import OrderSerializer, DeliverySerializer, OrderCreateSerializer
+from .models import Order, Delivery, UserAddress
+from .serializers import OrderSerializer, DeliverySerializer, OrderCreateSerializer, UserAddressSerializer
 
 # ---- ORDER VIEWS ----
+class OrderCreateView(generics.CreateAPIView):
+    """View to create a new order."""
+    # pylint: disable=no-member
+    queryset = Order.objects.all()
+    serializer_class = OrderCreateSerializer
+    permission_classes = [IsAuthenticated]
+    def create(self, request, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Order create request data: {request.data}")
+        logger.info(f"User: {request.user}")
+        
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Order creation failed: {str(e)}")
+            raise
 
 class OrderListView(generics.ListAPIView):
     """View to list all orders."""
     # pylint: disable=no-member
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated]
-
-class OrderCreateView(generics.CreateAPIView):
-    """View to create a new order."""
-    # pylint: disable=no-member
-    queryset = Order.objects.all()
-    serializer_class = OrderCreateSerializer
     permission_classes = [IsAuthenticated]
 
 class OrderDetailView(generics.RetrieveAPIView):
@@ -78,3 +88,16 @@ class DeliveryDeleteView(generics.DestroyAPIView):
     queryset = Delivery.objects.all()
     serializer_class = DeliverySerializer
     permission_classes = [IsAuthenticated]
+
+
+# ---- USER ADDRESS VIEWS ----
+
+class UserAddressViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing user addresses."""
+    serializer_class = UserAddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return addresses for the authenticated user only."""
+        # pylint: disable=no-member
+        return UserAddress.objects.filter(user=self.request.user)
