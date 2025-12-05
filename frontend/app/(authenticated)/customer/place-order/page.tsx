@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt } from "react-icons/fa";
+import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt, FaPlus, FaSave } from "react-icons/fa";
 import { branchAPI, Branch } from "../../../services/branchService";
+import { addressAPI, UserAddress } from "../../../services/addressService";
 import { useAuth } from "../../../contexts/AuthContext";
 
 // Dynamically import the MapAddressSelector to avoid SSR issues
@@ -72,8 +73,50 @@ export default function CustomerPlaceOrderPage() {
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryMapLink, setDeliveryMapLink] = useState("");
 
+  // Saved addresses state
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+  const [selectedPickupAddressId, setSelectedPickupAddressId] = useState<number | null>(null);
+  const [selectedDeliveryAddressId, setSelectedDeliveryAddressId] = useState<number | null>(null);
+  const [showNewPickupAddress, setShowNewPickupAddress] = useState(false);
+  const [showNewDeliveryAddress, setShowNewDeliveryAddress] = useState(false);
+  const [savePickupAddress, setSavePickupAddress] = useState(false);
+  const [saveDeliveryAddress, setSaveDeliveryAddress] = useState(false);
+
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading] = useState(false);
+
+  // Fetch saved addresses
+  const fetchAddresses = useCallback(async () => {
+    try {
+      setAddressesLoading(true);
+      const addresses = await addressAPI.list();
+      setSavedAddresses(addresses);
+
+      // Auto-select default addresses if available
+      const defaultPickup = addresses.find(
+        a => a.is_default && (a.address_type === 'pickup' || a.address_type === 'both')
+      );
+      const defaultDelivery = addresses.find(
+        a => a.is_default && (a.address_type === 'delivery' || a.address_type === 'both')
+      );
+
+      if (defaultPickup) {
+        setSelectedPickupAddressId(defaultPickup.id);
+        setPickupAddress(defaultPickup.address);
+        setPickupMapLink(defaultPickup.map_link || '');
+      }
+      if (defaultDelivery) {
+        setSelectedDeliveryAddressId(defaultDelivery.id);
+        setDeliveryAddress(defaultDelivery.address);
+        setDeliveryMapLink(defaultDelivery.map_link || '');
+      }
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
+    } finally {
+      setAddressesLoading(false);
+    }
+  }, []);
 
   const fetchBranches = useCallback(async () => {
     try {
@@ -101,10 +144,77 @@ export default function CustomerPlaceOrderPage() {
     }
   }, [selectedBranch]);
 
-  // Fetch branches on mount
+  // Fetch branches and addresses on mount
   useEffect(() => {
     fetchBranches();
-  }, [fetchBranches]);
+    fetchAddresses();
+  }, [fetchBranches, fetchAddresses]);
+
+  // Get pickup addresses (type 'pickup' or 'both')
+  const pickupAddresses = savedAddresses.filter(
+    a => a.address_type === 'pickup' || a.address_type === 'both'
+  );
+
+  // Get delivery addresses (type 'delivery' or 'both')
+  const deliveryAddresses = savedAddresses.filter(
+    a => a.address_type === 'delivery' || a.address_type === 'both'
+  );
+
+  // Handle saved address selection for pickup
+  const handlePickupAddressSelection = (addressId: number | null) => {
+    setSelectedPickupAddressId(addressId);
+    if (addressId === null) {
+      setShowNewPickupAddress(true);
+      setPickupAddress('');
+      setPickupMapLink('');
+    } else {
+      setShowNewPickupAddress(false);
+      const address = savedAddresses.find(a => a.id === addressId);
+      if (address) {
+        setPickupAddress(address.address);
+        setPickupMapLink(address.map_link || '');
+      }
+    }
+  };
+
+  // Handle saved address selection for delivery
+  const handleDeliveryAddressSelection = (addressId: number | null) => {
+    setSelectedDeliveryAddressId(addressId);
+    if (addressId === null) {
+      setShowNewDeliveryAddress(true);
+      setDeliveryAddress('');
+      setDeliveryMapLink('');
+    } else {
+      setShowNewDeliveryAddress(false);
+      const address = savedAddresses.find(a => a.id === addressId);
+      if (address) {
+        setDeliveryAddress(address.address);
+        setDeliveryMapLink(address.map_link || '');
+      }
+    }
+  };
+
+  // Save new address to backend
+  const saveNewAddress = async (
+    address: string,
+    mapLink: string,
+    type: 'pickup' | 'delivery'
+  ) => {
+    try {
+      const newAddress = await addressAPI.create({
+        address,
+        map_link: mapLink || undefined,
+        address_type: type,
+        is_default: false,
+      });
+      setSavedAddresses(prev => [...prev, newAddress]);
+      return newAddress;
+    } catch (error) {
+      console.error('Error saving address:', error);
+      return null;
+    }
+  };
+
 
   const getPrice = () => {
     if (!clothName || !material) return 0;
@@ -218,9 +328,17 @@ export default function CustomerPlaceOrderPage() {
     return errs.length === 0;
   };
 
-  const proceedToCheckout = () => {
+  const proceedToCheckout = async () => {
     if (!validateOrder()) {
       return;
+    }
+
+    // Save new addresses if user checked the save checkbox
+    if (pickupEnabled && savePickupAddress && pickupAddress && selectedPickupAddressId === null) {
+      await saveNewAddress(pickupAddress, pickupMapLink, 'pickup');
+    }
+    if (deliveryEnabled && saveDeliveryAddress && deliveryAddress && selectedDeliveryAddressId === null) {
+      await saveNewAddress(deliveryAddress, deliveryMapLink, 'delivery');
     }
 
     // Prepare order data for checkout
@@ -450,14 +568,62 @@ export default function CustomerPlaceOrderPage() {
                           />
                         </div>
                       </div>
+
+                      {/* Saved Pickup Address Selection */}
                       <div>
                         <label className="block text-sm font-medium mb-1">Pickup Address</label>
-                        <MapAddressSelector
-                          onAddressSelect={handlePickupAddressSelect}
-                          initialAddress={pickupAddress}
-                          initialMapLink={pickupMapLink}
-                          height="200px"
-                        />
+                        {addressesLoading ? (
+                          <div className="text-blue-600 text-sm">Loading saved addresses...</div>
+                        ) : pickupAddresses.length > 0 ? (
+                          <div className="space-y-2">
+                            <select
+                              className="w-full border rounded px-3 py-2"
+                              value={selectedPickupAddressId || "new"}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handlePickupAddressSelection(val === "new" ? null : parseInt(val));
+                              }}
+                            >
+                              {pickupAddresses.map((addr) => (
+                                <option key={addr.id} value={addr.id}>
+                                  {addr.address} {addr.is_default ? "(Default)" : ""}
+                                </option>
+                              ))}
+                              <option value="new">+ Add New Address</option>
+                            </select>
+
+                            {selectedPickupAddressId && pickupAddress && (
+                              <div className="p-2 bg-blue-50 rounded text-sm flex items-center gap-2">
+                                <FaMapMarkerAlt className="text-blue-600" />
+                                <span>{pickupAddress}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 mb-2">No saved pickup addresses. Add a new one below.</div>
+                        )}
+
+                        {/* New Address Form (shown when no saved addresses or "Add New" selected) */}
+                        {(pickupAddresses.length === 0 || showNewPickupAddress || selectedPickupAddressId === null) && (
+                          <div className="mt-2 space-y-2">
+                            <MapAddressSelector
+                              onAddressSelect={handlePickupAddressSelect}
+                              initialAddress={pickupAddress}
+                              initialMapLink={pickupMapLink}
+                              height="200px"
+                            />
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={savePickupAddress}
+                                onChange={(e) => setSavePickupAddress(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <FaSave className="text-green-600" />
+                              <span>Save this address for future orders</span>
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -497,14 +663,62 @@ export default function CustomerPlaceOrderPage() {
                           />
                         </div>
                       </div>
+
+                      {/* Saved Delivery Address Selection */}
                       <div>
                         <label className="block text-sm font-medium mb-1">Delivery Address</label>
-                        <MapAddressSelector
-                          onAddressSelect={handleDeliveryAddressSelect}
-                          initialAddress={deliveryAddress}
-                          initialMapLink={deliveryMapLink}
-                          height="200px"
-                        />
+                        {addressesLoading ? (
+                          <div className="text-blue-600 text-sm">Loading saved addresses...</div>
+                        ) : deliveryAddresses.length > 0 ? (
+                          <div className="space-y-2">
+                            <select
+                              className="w-full border rounded px-3 py-2"
+                              value={selectedDeliveryAddressId || "new"}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleDeliveryAddressSelection(val === "new" ? null : parseInt(val));
+                              }}
+                            >
+                              {deliveryAddresses.map((addr) => (
+                                <option key={addr.id} value={addr.id}>
+                                  {addr.address} {addr.is_default ? "(Default)" : ""}
+                                </option>
+                              ))}
+                              <option value="new">+ Add New Address</option>
+                            </select>
+
+                            {selectedDeliveryAddressId && deliveryAddress && (
+                              <div className="p-2 bg-green-50 rounded text-sm flex items-center gap-2">
+                                <FaMapMarkerAlt className="text-green-600" />
+                                <span>{deliveryAddress}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 mb-2">No saved delivery addresses. Add a new one below.</div>
+                        )}
+
+                        {/* New Address Form (shown when no saved addresses or "Add New" selected) */}
+                        {(deliveryAddresses.length === 0 || showNewDeliveryAddress || selectedDeliveryAddressId === null) && (
+                          <div className="mt-2 space-y-2">
+                            <MapAddressSelector
+                              onAddressSelect={handleDeliveryAddressSelect}
+                              initialAddress={deliveryAddress}
+                              initialMapLink={deliveryMapLink}
+                              height="200px"
+                            />
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={saveDeliveryAddress}
+                                onChange={(e) => setSaveDeliveryAddress(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <FaSave className="text-green-600" />
+                              <span>Save this address for future orders</span>
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

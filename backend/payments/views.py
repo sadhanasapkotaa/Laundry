@@ -141,8 +141,8 @@ class InitiatePaymentView(View):
                 'product_code': settings.ESEWA_PRODUCT_CODE,
                 'product_service_charge': '0',
                 'product_delivery_charge': '0',
-                'success_url': f"{settings.FRONTEND_URL}/place-orders/checkout",
-                'failure_url': f"{settings.FRONTEND_URL}/place-orders/failure",
+                'success_url': f"{settings.FRONTEND_URL}/customer/place-order/checkout",
+                'failure_url': f"{settings.FRONTEND_URL}/customer/place-order/checkout",
                 'signed_field_names': 'total_amount,transaction_uuid,product_code',
                 'signature': signature
             }

@@ -31,7 +31,7 @@ const LocationMarker: React.FC<LocationMarkerProps> = ({ position, setPosition, 
     click(e) {
       const newPosition = { lat: e.latlng.lat, lng: e.latlng.lng };
       setPosition(newPosition);
-      
+
       // Reverse geocoding to get address
       reverseGeocode(newPosition.lat, newPosition.lng).then((address) => {
         const mapLink = `https://www.openstreetmap.org/?mlat=${newPosition.lat}&mlon=${newPosition.lng}&zoom=16`;
@@ -109,13 +109,13 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        (geoPosition) => {
           const userPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lat: geoPosition.coords.latitude,
+            lng: geoPosition.coords.longitude
           };
           setUserLocation(userPos);
-          
+
           // If no initial position provided, use user's location
           if (!position) {
             setPosition(userPos);
@@ -158,13 +158,13 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({
 
   const handleSearchAddress = async () => {
     if (!searchAddress.trim()) return;
-    
+
     const coordinates = await forwardGeocode(searchAddress);
     if (coordinates) {
       setPosition(coordinates);
       const mapLink = `https://www.openstreetmap.org/?mlat=${coordinates.lat}&mlon=${coordinates.lng}&zoom=16`;
       onAddressSelect(searchAddress, mapLink);
-      
+
       // Pan map to the new location
       if (mapRef.current) {
         mapRef.current.setView([coordinates.lat, coordinates.lng], 16);
@@ -182,7 +182,7 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({
         const mapLink = `https://www.openstreetmap.org/?mlat=${userLocation.lat}&mlon=${userLocation.lng}&zoom=16`;
         onAddressSelect(address, mapLink);
       });
-      
+
       // Pan map to user's location
       if (mapRef.current) {
         mapRef.current.setView([userLocation.lat, userLocation.lng], 16);

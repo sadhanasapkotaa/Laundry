@@ -13,14 +13,15 @@ export interface OrderItem {
 }
 
 export interface Order {
-  id: number;
+  id: string;
   order_id: string;
-  user: number;
+  customer_name?: string;
   branch: number;
   branch_name: string;
   services: OrderItem[];
   pickup_enabled: boolean;
   delivery_enabled: boolean;
+  pickup_requested?: boolean;
   pickup_date?: string;
   pickup_time?: string;
   pickup_address?: string;
@@ -32,10 +33,11 @@ export interface Order {
   is_urgent: boolean;
   total_amount: number;
   payment_method: 'cash' | 'bank' | 'esewa';
-  payment_status: 'pending' | 'paid' | 'unpaid' | 'failed';
-  status: 'pending' | 'processing' | 'ready' | 'delivered' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'failed';
+  status: 'pending pickup' | 'pending' | 'in progress' | 'to be delivered' | 'completed' | 'cancelled';
   created: string;
-  modified: string;
+  order_date?: string;
+  description?: string;
   delivery_contact?: string;
   esewa_reference?: string;
 }
@@ -56,15 +58,14 @@ export interface CreateOrderRequest {
   is_urgent: boolean;
   total_amount: number;
   payment_method: 'cash' | 'bank' | 'esewa';
-  payment_status: 'pending' | 'paid' | 'unpaid';
-  status: 'pending';
+  payment_status: 'pending' | 'paid';
   description?: string;
   delivery_contact?: string;
 }
 
 export interface UpdateOrderRequest {
-  payment_status?: 'pending' | 'paid' | 'unpaid' | 'failed';
-  status?: 'pending' | 'processing' | 'ready' | 'delivered' | 'cancelled';
+  payment_status?: 'pending' | 'paid' | 'failed';
+  status?: 'pending pickup' | 'pending' | 'in progress' | 'to be delivered' | 'completed' | 'cancelled';
   esewa_reference?: string;
   delivery_contact?: string;
 }

@@ -62,7 +62,19 @@ export default function CustomerCheckoutPage() {
     const [orderNotes, setOrderNotes] = useState("");
 
     useEffect(() => {
-        // Load order data from localStorage
+        // Check for eSewa payment return FIRST (before checking localStorage)
+        // This ensures we process the payment callback before any redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataParam = urlParams.get('data');
+        const failureReason = urlParams.get('failure_reason') || urlParams.get('error');
+
+        if (dataParam || failureReason) {
+            // eSewa callback - let checkEsewaReturn handle it
+            checkEsewaReturn();
+            return;
+        }
+
+        // Load order data from localStorage (only if not an eSewa callback)
         const storedOrderData = localStorage.getItem('customerOrderData');
         if (storedOrderData) {
             try {
@@ -73,12 +85,9 @@ export default function CustomerCheckoutPage() {
                 router.push('/customer/place-order');
             }
         } else {
-            // No order data, redirect back to order page
+            // No order data and not an eSewa callback, redirect back to order page
             router.push('/customer/place-order');
         }
-
-        // Check for eSewa payment return
-        checkEsewaReturn();
     }, [router]);
 
     const checkEsewaReturn = () => {
@@ -134,10 +143,13 @@ export default function CustomerCheckoutPage() {
 
             // First verify the payment with backend
             const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
+            const accessToken = localStorage.getItem('accessToken');
+
             const verificationResponse = await fetch(`${API_BASE}/payments/verify-esewa/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
                 },
                 body: JSON.stringify({
                     transaction_uuid: transactionUuid,
@@ -177,6 +189,9 @@ export default function CustomerCheckoutPage() {
 
     const createOrder = async (data: OrderData, paymentMethod: string, status: string, paymentRef?: string) => {
         try {
+            // Map frontend payment method to backend choices
+            const backendPaymentMethod = paymentMethod === 'cod' ? 'cash' : paymentMethod;
+
             // Prepare order data for API
             const orderRequest = {
                 branch: data.branch,
@@ -200,16 +215,26 @@ export default function CustomerCheckoutPage() {
                 delivery_map_link: data.delivery?.map_link || undefined,
                 is_urgent: data.services.isUrgent,
                 total_amount: data.pricing.total,
-                payment_method: paymentMethod as 'cash' | 'bank' | 'esewa',
-                payment_status: status as 'pending' | 'paid' | 'unpaid',
-                status: 'pending' as const,
+                payment_method: backendPaymentMethod as 'cash' | 'bank' | 'esewa',
+                payment_status: status as 'pending' | 'paid',
                 description: paymentRef ? `${orderNotes}${orderNotes ? ' | ' : ''}Payment Reference: ${paymentRef}` : orderNotes,
             };
 
+            console.log('=== ORDER API REQUEST ===');
+            console.log('Order request data:', JSON.stringify(orderRequest, null, 2));
+
             const response = await orderAPI.create(orderRequest);
+            console.log('=== ORDER API RESPONSE ===');
+            console.log('Order created successfully:', response);
             return response;
-        } catch (error) {
+        } catch (error: unknown) {
+            console.error('=== ORDER API ERROR ===');
             console.error('Error creating order:', error);
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as { response?: { data?: unknown; status?: number } };
+                console.error('Error response data:', axiosError.response?.data);
+                console.error('Error response status:', axiosError.response?.status);
+            }
             throw error;
         }
     };

@@ -25,8 +25,11 @@ class OrderSerializer(serializers.ModelSerializer):
     pickup_date = serializers.SerializerMethodField()
     pickup_time = serializers.SerializerMethodField()
     pickup_address = serializers.SerializerMethodField()
+    pickup_map_link = serializers.SerializerMethodField()
     delivery_time = serializers.SerializerMethodField()
     delivery_address = serializers.SerializerMethodField()
+    delivery_map_link = serializers.SerializerMethodField()
+    delivery_contact = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -35,8 +38,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'order_date', 'created', 'pickup_enabled', 'delivery_enabled', 'delivery_date', 
             'status', 'description', 'total_amount', 'is_urgent', 'payment_method', 
             'payment_status', 'services',
-            'pickup_date', 'pickup_time', 'pickup_address',
-            'delivery_time', 'delivery_address'
+            'pickup_date', 'pickup_time', 'pickup_address', 'pickup_map_link',
+            'delivery_time', 'delivery_address', 'delivery_map_link', 'delivery_contact'
         ]
 
     def get_pickup_delivery(self, obj, delivery_type):
@@ -58,6 +61,20 @@ class OrderSerializer(serializers.ModelSerializer):
         delivery = self.get_pickup_delivery(obj, 'pickup')
         return delivery.delivery_address if delivery else None
 
+    def get_pickup_map_link(self, obj):
+        """Get the map link for pickup address."""
+        delivery = self.get_pickup_delivery(obj, 'pickup')
+        if delivery:
+            # Try to find map link from UserAddress if address matches
+            from orders.models import UserAddress
+            user_address = UserAddress.objects.filter(
+                user=obj.customer_name,
+                address=delivery.delivery_address
+            ).first()
+            if user_address and user_address.map_link:
+                return user_address.map_link
+        return None
+
     def get_delivery_time(self, obj):
         delivery = self.get_pickup_delivery(obj, 'drop')
         if delivery and delivery.delivery_start_time:
@@ -68,6 +85,31 @@ class OrderSerializer(serializers.ModelSerializer):
         delivery = self.get_pickup_delivery(obj, 'drop')
         return delivery.delivery_address if delivery else None
 
+    def get_delivery_map_link(self, obj):
+        """Get the map link for delivery address."""
+        delivery = self.get_pickup_delivery(obj, 'drop')
+        if delivery:
+            # Try to find map link from UserAddress if address matches
+            from orders.models import UserAddress
+            user_address = UserAddress.objects.filter(
+                user=obj.customer_name,
+                address=delivery.delivery_address
+            ).first()
+            if user_address and user_address.map_link:
+                return user_address.map_link
+        return None
+
+    def get_delivery_contact(self, obj):
+        """Get the delivery contact from the delivery object."""
+        delivery = self.get_pickup_delivery(obj, 'drop')
+        if delivery:
+            return delivery.delivery_contact
+        # Fallback to pickup delivery contact
+        pickup = self.get_pickup_delivery(obj, 'pickup')
+        if pickup:
+            return pickup.delivery_contact
+        return None
+
 
 class OrderCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating orders with nested order items."""
@@ -75,12 +117,12 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     branch = serializers.IntegerField(write_only=True)
     pickup_date = serializers.DateField(required=False, allow_null=True)
     pickup_time = serializers.TimeField(required=False, allow_null=True)
-    pickup_address = serializers.CharField(required=False, allow_blank=True)
-    pickup_map_link = serializers.URLField(required=False, allow_blank=True)
+    pickup_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    pickup_map_link = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     delivery_date = serializers.DateField(required=False, allow_null=True)
     delivery_time = serializers.TimeField(required=False, allow_null=True)
-    delivery_address = serializers.CharField(required=False, allow_blank=True)
-    delivery_map_link = serializers.URLField(required=False, allow_blank=True)
+    delivery_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    delivery_map_link = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     # Return fields for response
     id = serializers.UUIDField(source='order_id', read_only=True)
     order_id = serializers.UUIDField(read_only=True)
@@ -178,7 +220,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             Delivery.objects.create(
                 order=order,
                 delivery_address=pickup_address or "No address provided",
-                delivery_contact=user.phone, # Use phone number string
+                delivery_contact=user.phone or "",  # Handle None phone
                 delivery_type='pickup',
                 status='pending',
                 delivery_start_time=datetime.combine(pickup_date, pickup_time) if pickup_date and pickup_time else None,
@@ -188,7 +230,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             Delivery.objects.create(
                 order=order,
                 delivery_address=delivery_address or "No address provided",
-                delivery_contact=user.phone, # Use phone number string
+                delivery_contact=user.phone or "",  # Handle None phone
                 delivery_type='drop',
                 status='pending',
                 delivery_start_time=datetime.combine(delivery_date, delivery_time) if delivery_date and delivery_time else None,
