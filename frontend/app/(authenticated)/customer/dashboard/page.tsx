@@ -1,38 +1,88 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 import { FiPackage, FiClock, FiUser, FiCreditCard } from "react-icons/fi";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import "../../../types/i18n";
+import { orderAPI, Order, OrderStats } from "../../../services/orderService";
+import { PaymentService } from "../../../services/paymentService";
 
 export default function CustomerDashboardPage() {
   const { user } = useAuth();
   const { t } = useTranslation();
 
-  // Mock data - replace with actual API calls
-  const stats = {
-    activeOrders: 2,
-    completedOrders: 15,
-    pendingPayments: 1,
-    totalSpent: 3420,
+  const [stats, setStats] = useState<OrderStats['stats'] | null>(null);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch stats and orders in parallel
+        const [statsResponse, ordersData] = await Promise.all([
+          orderAPI.getStats(),
+          orderAPI.list(),
+        ]);
+
+        if (statsResponse.success) {
+          setStats(statsResponse.stats);
+        }
+
+        // Get recent 5 orders sorted by date (newest first)
+        const sortedOrders = [...(ordersData || [])]
+          .sort((a, b) => new Date(b.created || b.order_date || '').getTime() - new Date(a.created || a.order_date || '').getTime())
+          .slice(0, 5);
+        setRecentOrders(sortedOrders);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Use stats from backend
+  const displayStats = {
+    activeOrders: stats?.active_orders || 0,
+    completedOrders: stats?.completed_orders || 0,
+    pendingPayments: stats?.pending_payments_count || 0,
+    pendingAmount: stats?.pending_amount || 0,
   };
 
-  const recentOrders = [
-    {
-      id: "ORD-001",
-      status: "processing",
-      date: "2024-12-20",
-      total: 450,
-    },
-    {
-      id: "ORD-002",
-      status: "completed",
-      date: "2024-12-18",
-      total: 650,
-    },
-  ];
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <div className="animate-pulse">
+            <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+            <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <div className="animate-pulse flex items-center">
+                <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="ml-5 flex-1">
+                  <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                  <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -45,6 +95,12 @@ export default function CustomerDashboardPage() {
           {t('customer.dashboard.whatsHappening')}
         </p>
       </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-700 dark:text-red-400">{error}</p>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -59,7 +115,7 @@ export default function CustomerDashboardPage() {
                   {t('customer.dashboard.activeOrders')}
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                  {stats.activeOrders}
+                  {displayStats.activeOrders}
                 </dd>
               </dl>
             </div>
@@ -77,7 +133,7 @@ export default function CustomerDashboardPage() {
                   {t('customer.dashboard.completedOrders')}
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                  {stats.completedOrders}
+                  {displayStats.completedOrders}
                 </dd>
               </dl>
             </div>
@@ -95,7 +151,7 @@ export default function CustomerDashboardPage() {
                   {t('customer.dashboard.pendingPayments')}
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                  {stats.pendingPayments}
+                  {displayStats.pendingPayments}
                 </dd>
               </dl>
             </div>
@@ -110,10 +166,10 @@ export default function CustomerDashboardPage() {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                  {t('customer.dashboard.totalSpent')}
+                  Pending Amount
                 </dt>
                 <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                  ₨ {stats.totalSpent}
+                  ₨ {displayStats.pendingAmount.toLocaleString()}
                 </dd>
               </dl>
             </div>
@@ -148,12 +204,12 @@ export default function CustomerDashboardPage() {
           </Link>
 
           <Link
-            href="/customer/payment-history"
+            href="/customer/payment"
             className="flex items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
           >
             <FiCreditCard className="h-6 w-6 text-purple-600 mr-3" />
             <span className="text-purple-700 dark:text-purple-300 font-medium">
-              {t('customer.dashboard.paymentHistory')}
+              Make Payment
             </span>
           </Link>
         </div>
@@ -173,37 +229,49 @@ export default function CustomerDashboardPage() {
           </Link>
         </div>
         <div className="space-y-3">
-          {recentOrders.map((order) => (
-            <div
-              key={order.id}
-              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
-            >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FiPackage className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {order.id}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {order.date}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  ₨ {order.total}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                  {order.status}
-                </p>
-              </div>
+          {recentOrders.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <FiPackage className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No orders yet</p>
+              <Link href="/customer/place-order" className="text-blue-600 hover:underline text-sm">
+                Place your first order
+              </Link>
             </div>
-          ))}
+          ) : (
+            recentOrders.map((order) => (
+              <div
+                key={order.id}
+                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+              >
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FiPackage className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {order.order_id}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {order.created ? new Date(order.created).toLocaleDateString() : order.order_date}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    ₨ {order.total_amount?.toLocaleString()}
+                  </p>
+                  <p className={`text-sm capitalize ${order.status === 'completed' ? 'text-green-600' :
+                    order.status === 'cancelled' ? 'text-red-600' :
+                      'text-yellow-600'
+                    }`}>
+                    {order.status}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 }
-

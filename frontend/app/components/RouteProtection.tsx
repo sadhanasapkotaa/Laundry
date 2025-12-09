@@ -15,8 +15,8 @@ interface RouteProtectionProps {
   useLayout?: boolean;
 }
 
-export default function RouteProtection({ 
-  children, 
+export default function RouteProtection({
+  children,
   requiredPermissions,
   fallback,
   useLayout = true
@@ -66,6 +66,7 @@ export default function RouteProtection({
 
     // If no user, redirect to login
     if (!user) {
+      console.log('RouteProtection: No user found, redirecting to login', { pathname });
       setIsRedirecting(true);
       // Include current path as redirect parameter
       const redirectParam = pathname !== '/login' ? `?redirect=${encodeURIComponent(pathname)}` : '';
@@ -76,6 +77,7 @@ export default function RouteProtection({
     // Check if user should be redirected based on role and current path
     const redirectPath = shouldRedirect(user.role, pathname);
     if (redirectPath && redirectPath !== pathname) {
+      console.log('RouteProtection: Redirecting based on role', { role: user.role, pathname, redirectPath });
       setIsRedirecting(true);
       router.push(redirectPath);
       return;
@@ -87,7 +89,7 @@ export default function RouteProtection({
   // Handle page navigation for layout
   const handlePageChange = (page: string) => {
     setCurrentPage(page);
-    
+
     // Map page IDs to routes
     const pageRoutes: { [key: string]: string } = {
       "dashboard": "/dashboard",
@@ -139,15 +141,15 @@ export default function RouteProtection({
 
   // Check page permission
   let hasPermission = hasPagePermission(user.role, pathname);
-  
+
   // If specific permissions are required, check them as well
   if (hasPermission && requiredPermissions && requiredPermissions.length > 0) {
     const userPermissions = getRolePermissions(user.role);
-    hasPermission = requiredPermissions.some(permission => 
+    hasPermission = requiredPermissions.some(permission =>
       userPermissions.includes(permission)
     );
   }
-  
+
   if (!hasPermission) {
     return fallback || <PermissionDenied />;
   }

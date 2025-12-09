@@ -56,6 +56,7 @@ export const API_CONFIG = {
     // Payments
     PAYMENTS: {
       INITIATE: '/payments/initiate/',
+      VERIFY_ESEWA: '/payments/verify-esewa/',
       SUCCESS: '/payments/success/',
       FAILURE: '/payments/failure/',
       STATUS: (uuid: string) => `/payments/status/${uuid}/`,

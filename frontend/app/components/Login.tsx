@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLogin } from '../queries/authQueries';
 import { LoginRequest } from '../types/auth';
+import { getDefaultRedirectPath } from '../config/permissions';
 
 const Login = () => {
     const router = useRouter();
@@ -34,12 +35,12 @@ const Login = () => {
                 console.log('Login successful:', data);
                 console.log('User role from response:', data.role);
 
-                // Always redirect to dashboard after successful login
-                const redirectPath = '/dashboard';
-                console.log('Redirecting to dashboard:', redirectPath);
+                // Redirect to role-appropriate dashboard
+                const redirectPath = getDefaultRedirectPath(data.role as any);
+                console.log('Redirecting to role-based dashboard:', redirectPath);
 
-                // Use window.location.href for a hard redirect to ensure state is fresh
-                window.location.href = redirectPath;
+                // Use router.push for client-side navigation to preserve state
+                router.push(redirectPath);
             },
             onError: (error) => {
                 console.error('Login failed:', error);

@@ -70,6 +70,29 @@ export interface UpdateOrderRequest {
   delivery_contact?: string;
 }
 
+export interface OrderStats {
+  success: boolean;
+  stats: {
+    total_orders: number;
+    active_orders: number;
+    completed_orders: number;
+    pending_payments_count: number;
+    pending_amount: number;
+  };
+  pending_orders: Array<{
+    id: string;
+    order_id: string;
+    total_amount: number;
+    status: string;
+    order_date: string;
+  }>;
+  branch_pending_amounts?: Array<{
+    branch_name: string;
+    branch_id: number;
+    total_pending: number;
+  }>;
+}
+
 // Order API functions
 export const orderAPI = {
   // Create a new order
@@ -113,6 +136,12 @@ export const orderAPI = {
   // Delete an order
   delete: async (id: string | number): Promise<void> => {
     await api.delete(`/orders/${id}/delete/`);
+  },
+
+  // Get order statistics (pending amount, active orders, etc.)
+  getStats: async (): Promise<OrderStats> => {
+    const response = await api.get('/orders/stats/');
+    return response.data;
   },
 };
 

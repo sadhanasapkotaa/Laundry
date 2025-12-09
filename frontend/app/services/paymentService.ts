@@ -8,7 +8,14 @@ export interface PaymentData {
   amount: number;
   tax_amount: number;
   total_amount: number;
+  amount_applied?: number;
+  excess_amount?: number;
+  is_advance_payment?: boolean;  // New field to indicate advance payments
   payment_type: 'cash' | 'bank' | 'esewa';
+  payment_source?: 'order' | 'payment_page';
+  branch_name?: string;
+  branch_id?: number;
+  orders_count?: number;
   status: 'PENDING' | 'COMPLETE' | 'FAILED' | 'CANCELED' | 'FULL_REFUND' | 'PARTIAL_REFUND' | 'NOT_FOUND';
   ref_id?: string;
   created_at: string;
@@ -31,6 +38,34 @@ export interface PaymentInitiateRequest {
   payment_type: 'cash' | 'bank' | 'esewa';
   amount: number;
   order_id?: string;
+  branch_id?: number;
+  idempotency_key?: string;
+  payment_source?: 'order' | 'payment_page';  // Track payment origin
+  order_data?: {  // Order details for backend to create order after payment
+    branch: number;
+    services: Array<{
+      service_type: string;
+      material: string;
+      quantity: number;
+      pricing_type: string;
+      price_per_unit: number;
+      total_price: number;
+    }>;
+    pickup_enabled?: boolean;
+    delivery_enabled?: boolean;
+    pickup_date?: string;
+    pickup_time?: string;
+    pickup_address?: string;
+    pickup_map_link?: string;
+    delivery_date?: string;
+    delivery_time?: string;
+    delivery_address?: string;
+    delivery_map_link?: string;
+    is_urgent?: boolean;
+    total_amount: number;
+    payment_method?: string;
+    description?: string;
+  };
 }
 
 export interface EsewaPaymentData {
@@ -112,7 +147,7 @@ export class PaymentService {
   } = {}): Promise<PaymentHistoryResponse> {
     try {
       const queryParams = new URLSearchParams();
-      
+
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           queryParams.append(key, value.toString());
@@ -210,7 +245,7 @@ export class PaymentService {
     // Append to body and submit
     document.body.appendChild(form);
     form.submit();
-    
+
     // Clean up
     document.body.removeChild(form);
   }

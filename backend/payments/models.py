@@ -34,7 +34,10 @@ class Payment(models.Model):
     payment_type = models.CharField(max_length=10, choices=PAYMENT_TYPE_CHOICES, default='cash')
     transaction_code = models.CharField(max_length=50, blank=True, null=True)
     ref_id = models.CharField(max_length=50, blank=True, null=True)
+    branch = models.ForeignKey('branches.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     order_data = models.JSONField(blank=True, null=True, help_text="Order data to create order after payment")
+    payment_source = models.CharField(max_length=20, default='payment_page', 
+                                      help_text="Source of payment: 'order' or 'payment_page'")
     # Idempotency fields
     idempotency_key = models.CharField(max_length=100, blank=True, null=True, db_index=True,
                                        help_text="Unique key to prevent duplicate payment initiations")

@@ -32,6 +32,7 @@ class Order(models.Model):
     ], default='cash')
     payment_status = models.CharField(max_length=20, choices=[
         ('pending', 'Pending'),
+        ('partially_paid', 'Partially Paid'),
         ('paid', 'Paid'),
         ('failed', 'Failed')
     ], default='pending')
@@ -105,3 +106,22 @@ class UserAddress(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.address} ({self.address_type})"
+
+
+class OrderPayment(models.Model):
+    """Model to track which payments pay which orders (junction table)."""
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_payments')
+    payment = models.ForeignKey('payments.Payment', on_delete=models.CASCADE, related_name='order_payments')
+    amount_applied = models.DecimalField(max_digits=10, decimal_places=2, 
+                                         help_text="Portion of payment applied to this order")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', 'payment']),
+            models.Index(fields=['payment']),
+        ]
+    
+    def __str__(self):
+        return f"Payment {self.payment.transaction_uuid} -> Order {self.order.order_id}: Rs.{self.amount_applied}"

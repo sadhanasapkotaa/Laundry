@@ -141,7 +141,7 @@ export default function CustomerCheckoutPage() {
         try {
             setIsProcessing(true);
 
-            // First verify the payment with backend
+            // Verify the payment with backend (backend will create order automatically)
             const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
             const accessToken = localStorage.getItem('accessToken');
 
@@ -164,24 +164,17 @@ export default function CustomerCheckoutPage() {
                 throw new Error(verificationResult.error || 'Payment verification failed');
             }
 
-            const storedOrderData = localStorage.getItem('customerOrderData');
-            if (!storedOrderData) {
-                throw new Error('Order data not found');
-            }
-
-            const orderDataParsed = JSON.parse(storedOrderData);
-
-            // Create order with paid status
-            const order = await createOrder(orderDataParsed, 'esewa', 'paid', transactionCode);
-
             // Clear localStorage
             localStorage.removeItem('customerOrderData');
 
-            // Navigate to confirmation
-            router.push(`/customer/place-order/confirmation?orderId=${order.id}&paymentMethod=esewa&paymentRef=${transactionCode}&amount=${amount}`);
+            // Backend has created the order, redirect to success page
+            // The success page will fetch order details from the payment receipt
+            // Fixed: Ensure proper URL encoding for parameters
+            const encodedTransactionUuid = encodeURIComponent(transactionUuid);
+            router.push(`/customer/orders/success?transaction_uuid=${encodedTransactionUuid}`);
         } catch (error) {
             console.error('Error processing eSewa success:', error);
-            router.push(`/customer/place-order/failure?reason=Payment processing failed: ${error}`);
+            router.push(`/customer/orders/failure?reason=Payment processing failed: ${encodeURIComponent(error instanceof Error ? error.message : String(error))}`);
         } finally {
             setIsProcessing(false);
         }
@@ -262,11 +255,37 @@ export default function CustomerCheckoutPage() {
             const paymentResponse = await PaymentService.initiatePayment({
                 payment_type: "esewa",
                 amount: orderData.pricing.total,
-                order_id: `ORDER-${Date.now()}`,
+                branch_id: orderData.branch,
+                payment_source: 'order',  // Indicate this is an order placement payment
+                order_data: {
+                    branch: orderData.branch,
+                    services: orderData.cart.map(item => ({
+                        service_type: item.clothName,
+                        material: item.material,
+                        quantity: item.quantity,
+                        pricing_type: item.clothType,
+                        price_per_unit: item.unitPrice,
+                        total_price: item.price,
+                    })),
+                    pickup_enabled: orderData.services.pickupEnabled,
+                    delivery_enabled: orderData.services.deliveryEnabled,
+                    pickup_date: orderData.pickup?.date,
+                    pickup_time: orderData.pickup?.time,
+                    pickup_address: orderData.pickup?.address,
+                    pickup_map_link: orderData.pickup?.map_link,
+                    delivery_date: orderData.delivery?.date,
+                    delivery_time: orderData.delivery?.time,
+                    delivery_address: orderData.delivery?.address,
+                    delivery_map_link: orderData.delivery?.map_link,
+                    is_urgent: orderData.services.isUrgent,
+                    total_amount: orderData.pricing.total,
+                    payment_method: 'esewa',
+                    description: orderNotes,
+                },
             });
 
             if (paymentResponse.success && paymentResponse.payment_data && paymentResponse.esewa_url) {
-                // Store order data before redirect
+                // Store order data before redirect (for fallback)
                 localStorage.setItem('customerOrderData', JSON.stringify(orderData));
 
                 // Redirect to eSewa

@@ -65,10 +65,11 @@ const STATUS_META: Record<
 };
 
 const PAYMENT_STATUS_META: Record<
-  'pending' | 'paid' | 'unpaid' | 'failed',
+  'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed',
   { color: string; labelKey: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
 > = {
   pending: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.paymentStatus.pending", Icon: FaClock },
+  partially_paid: { color: "bg-blue-100 text-blue-800", labelKey: "orders.paymentStatus.partiallyPaid", Icon: FaSpinner },
   paid: { color: "bg-green-100 text-green-800", labelKey: "orders.paymentStatus.paid", Icon: FaCheckCircle },
   unpaid: { color: "bg-red-100 text-red-800", labelKey: "orders.paymentStatus.unpaid", Icon: FaExclamationTriangle },
   failed: { color: "bg-red-100 text-red-800", labelKey: "orders.paymentStatus.failed", Icon: FaExclamationTriangle },
@@ -105,7 +106,7 @@ export default function OrderManagement(): JSX.Element {
   // Function to map backend order to display format
   const mapBackendOrderToDisplay = (backendOrder: BackendOrder): DisplayOrder => {
     const services = backendOrder.services || [];
-    const items = services.map((service: { service_type: string; quantity: number }) => 
+    const items = services.map((service: { service_type: string; quantity: number }) =>
       `${service.service_type} (${service.quantity})`
     );
 
@@ -141,25 +142,25 @@ export default function OrderManagement(): JSX.Element {
   };
 
   // Fetch orders from backend
- const fetchOrders = useCallback(async () => {
-  try {
-    setIsLoading(true);
-    setError(null);
-    const backendOrders = await orderAPI.list({
-      ordering: "-created", // Get newest orders first
-    });
-    const displayOrders = backendOrders.map(mapBackendOrderToDisplay);
-    setOrders(displayOrders);
-  } catch (err: unknown) {
-    console.error("Error fetching orders:", err);
-    const errorMessage = err instanceof Error ? err.message : "Failed to fetch orders";
-    setError(errorMessage);
-  } finally {
-    setIsLoading(false);
-  }
-}, []);
+  const fetchOrders = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const backendOrders = await orderAPI.list({
+        ordering: "-created", // Get newest orders first
+      });
+      const displayOrders = backendOrders.map(mapBackendOrderToDisplay);
+      setOrders(displayOrders);
+    } catch (err: unknown) {
+      console.error("Error fetching orders:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch orders";
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  
+
   // };
 
   // Load orders on component mount
@@ -216,14 +217,14 @@ export default function OrderManagement(): JSX.Element {
   const openAdd = () => setIsAddOpen(true);
   const closeAdd = () => {
     setIsAddOpen(false);
-    setForm({ 
-      customerName: "", 
-      customerPhone: "", 
-      service: "Wash & Fold", 
-      items: "", 
-      amount: "", 
-      branchId: "1", 
-      branchName: "Main Branch", 
+    setForm({
+      customerName: "",
+      customerPhone: "",
+      service: "Wash & Fold",
+      items: "",
+      amount: "",
+      branchId: "1",
+      branchName: "Main Branch",
       notes: "",
       paymentMethod: "cash"
     });
@@ -231,19 +232,19 @@ export default function OrderManagement(): JSX.Element {
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate required fields
     if (!form.customerName.trim()) {
       alert('Please enter customer name');
       return;
     }
-    
+
     const orderAmount = Number(form.amount) || 0;
     if (orderAmount <= 0) {
       alert('Please enter a valid amount');
       return;
     }
-    
+
     setIsProcessingPayment(true);
 
     try {
@@ -288,10 +289,10 @@ export default function OrderManagement(): JSX.Element {
         if (paymentResponse.success && paymentResponse.payment_data && paymentResponse.esewa_url) {
           // Show success message and redirect to eSewa
           alert(`Order ${createdOrder.order_id} created successfully! Redirecting to eSewa for payment of Rs. ${orderAmount}...`);
-          
+
           // Submit to eSewa
           PaymentService.submitEsewaPayment(paymentResponse.payment_data, paymentResponse.esewa_url);
-          
+
           closeAdd();
           fetchOrders(); // Refresh orders list
         } else {
@@ -309,7 +310,7 @@ export default function OrderManagement(): JSX.Element {
           // Show bank details
           const bankDetails = paymentResponse.bank_details;
           alert(`Order ${createdOrder.order_id} created successfully!\n\nBank Transfer Details:\nAccount Name: ${bankDetails.account_name}\nAccount Number: ${bankDetails.account_number}\nBank: ${bankDetails.bank_name}\nSWIFT: ${bankDetails.swift_code}\n\nPlease transfer Rs. ${orderAmount} and keep the receipt.`);
-          
+
           closeAdd();
           fetchOrders(); // Refresh orders list
         } else {
@@ -333,7 +334,7 @@ export default function OrderManagement(): JSX.Element {
       }
     } catch (error: unknown) {
       console.error('Order creation error:', error);
-      
+
       // Show more specific error message
       let errorMessage = 'Failed to create order. Please try again.';
       if (error && typeof error === 'object' && 'response' in error) {
@@ -350,7 +351,7 @@ export default function OrderManagement(): JSX.Element {
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
+
       alert(`Error: ${errorMessage}`);
     } finally {
       setIsProcessingPayment(false);
@@ -365,10 +366,10 @@ export default function OrderManagement(): JSX.Element {
 
       // Update status in backend
       await orderAPI.update(orderId, { status: newStatus });
-      
+
       // Update local state
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
-      
+
       // Refresh orders to get latest data
       fetchOrders();
     } catch (error) {
@@ -377,7 +378,7 @@ export default function OrderManagement(): JSX.Element {
     }
   };
 
-  const handleChangePaymentStatus = async (orderId: string, newPaymentStatus: 'pending' | 'paid' | 'unpaid' | 'failed') => {
+  const handleChangePaymentStatus = async (orderId: string, newPaymentStatus: 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed') => {
     try {
       // Find the order to get its backend ID
       const order = orders.find(o => o.id === orderId);
@@ -385,10 +386,10 @@ export default function OrderManagement(): JSX.Element {
 
       // Update payment status in backend
       await orderAPI.update(orderId, { payment_status: newPaymentStatus });
-      
+
       // Update local state
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, paymentStatus: newPaymentStatus } : o)));
-      
+
       // Refresh orders to get latest data
       fetchOrders();
     } catch (error) {
@@ -410,7 +411,7 @@ export default function OrderManagement(): JSX.Element {
   };
 
   // Payment status badge
-  const PaymentStatusBadge: React.FC<{ status: 'pending' | 'paid' | 'unpaid' | 'failed' }> = ({ status }) => {
+  const PaymentStatusBadge: React.FC<{ status: 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed' }> = ({ status }) => {
     const meta = PAYMENT_STATUS_META[status];
     const Icon = meta.Icon;
     return (
@@ -450,7 +451,7 @@ export default function OrderManagement(): JSX.Element {
             <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
               <FaExclamationTriangle />
               <span>{error}</span>
-              <button 
+              <button
                 onClick={fetchOrders}
                 className="underline hover:no-underline"
               >
@@ -494,6 +495,7 @@ export default function OrderManagement(): JSX.Element {
           >
             <option value="all">{t("orders.filter.allPayment", "All Payment Status")}</option>
             <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
+            <option value="partially_paid">{t("orders.paymentStatus.partiallyPaid", "Partially Paid")}</option>
             <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
             <option value="unpaid">{t("orders.paymentStatus.unpaid", "Unpaid")}</option>
             <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
@@ -601,14 +603,15 @@ export default function OrderManagement(): JSX.Element {
                   </td>
                   <td className="px-3 py-3 align-top">
                     <div className="flex flex-col gap-2">
-                      <PaymentStatusBadge status={order.paymentStatus as 'pending' | 'paid' | 'unpaid' | 'failed'} />
+                      <PaymentStatusBadge status={order.paymentStatus as 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed'} />
                       <select
                         value={order.paymentStatus}
-                        onChange={(e) => handleChangePaymentStatus(order.id, e.target.value as 'pending' | 'paid' | 'unpaid' | 'failed')}
+                        onChange={(e) => handleChangePaymentStatus(order.id, e.target.value as 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed')}
                         aria-label={t("orders.changePaymentStatus", "Change payment status")}
                         className="px-2 py-1 border rounded-md text-xs"
                       >
                         <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
+                        <option value="partially_paid">{t("orders.paymentStatus.partiallyPaid", "Partially Paid")}</option>
                         <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
                         <option value="unpaid">{t("orders.paymentStatus.unpaid", "Unpaid")}</option>
                         <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
@@ -779,13 +782,11 @@ export default function OrderManagement(): JSX.Element {
               </label>
 
               {form.paymentMethod !== 'cash' && (
-                <div className={`p-3 rounded-md ${
-                  form.paymentMethod === 'esewa' ? 'bg-green-50' : 'bg-blue-50'
-                }`}>
-                  <p className={`text-sm ${
-                    form.paymentMethod === 'esewa' ? 'text-green-800' : 'text-blue-800'
+                <div className={`p-3 rounded-md ${form.paymentMethod === 'esewa' ? 'bg-green-50' : 'bg-blue-50'
                   }`}>
-                    {form.paymentMethod === 'esewa' 
+                  <p className={`text-sm ${form.paymentMethod === 'esewa' ? 'text-green-800' : 'text-blue-800'
+                    }`}>
+                    {form.paymentMethod === 'esewa'
                       ? '🚀 You will be redirected to eSewa for secure online payment after creating the order.'
                       : '🏛️ Bank transfer details will be provided after creating the order. Please transfer the amount and keep the receipt.'
                     }
@@ -794,22 +795,22 @@ export default function OrderManagement(): JSX.Element {
               )}
 
               <div className="flex gap-2 justify-end">
-                <button 
-                  type="button" 
-                  onClick={closeAdd} 
+                <button
+                  type="button"
+                  onClick={closeAdd}
                   className="px-4 py-2 border rounded-md"
                   disabled={isProcessingPayment}
                 >
                   {t("common.cancel", "Cancel")}
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 disabled:opacity-50"
                   disabled={isProcessingPayment}
                 >
                   {isProcessingPayment && <FaSpinner className="animate-spin" />}
-                  {isProcessingPayment 
-                    ? (form.paymentMethod === 'esewa' ? 'Processing Payment...' : 'Creating Order...') 
+                  {isProcessingPayment
+                    ? (form.paymentMethod === 'esewa' ? 'Processing Payment...' : 'Creating Order...')
                     : t("orders.create", "Create Order")
                   }
                 </button>

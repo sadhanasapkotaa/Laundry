@@ -148,7 +148,7 @@ export const useLogin = () => {
       };
 
       // Update user cache
-      queryClient.setQueryData(authKeys.user(), user);
+      queryClient.setQueryData(authKeys.profile(), user);
 
       // Invalidate auth queries to fetch fresh profile data
       queryClient.invalidateQueries({ queryKey: authKeys.all });
@@ -219,6 +219,7 @@ export const useProfile = () => {
     enabled: !!getAccessToken(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: (failureCount, error) => {
+      console.error('useProfile fetch error:', error);
       // Don't retry on 401 errors
       const errWithResp = error as { response?: { status?: number } } | undefined;
       if (errWithResp?.response?.status === 401) {

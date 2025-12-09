@@ -139,6 +139,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       path: "/customer/place-order",
       roles: ["customer"],
     },
+    {
+      id: "customer-payment",
+      icon: FaCreditCard,
+      label: t("navigation.payment") || "Payment",
+      path: "/customer/payment",
+      roles: ["customer"],
+    },
     // Profile for all roles (always present)
     {
       id: "profile",
@@ -182,9 +189,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
 
       {/* Desktop Sidebar */}
       <div
-        className={`hidden md:flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? "w-64" : "w-16"
-        } h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-sm`}
+        className={`hidden md:flex flex-col transition-all duration-300 ease-in-out ${isOpen ? "w-64" : "w-16"
+          } h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-sm`}
       >
         {/* Logo + Collapse Button */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
@@ -244,10 +250,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
                 key={item.id}
                 onClick={() => handleNavigation(item)}
                 className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 group
-                  ${
-                    isActive
-                      ? "bg-blue-500 text-white shadow-sm"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                  ${isActive
+                    ? "bg-blue-500 text-white shadow-sm"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
                   }
                   ${!isOpen ? "justify-center" : ""}
                 `}
@@ -345,10 +350,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
                       setIsMobileOpen(false);
                     }}
                     className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200
-                      ${
-                        isActive
-                          ? "bg-blue-500 text-white shadow-sm"
-                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      ${isActive
+                        ? "bg-blue-500 text-white shadow-sm"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                       }
                     `}
                   >

@@ -20,7 +20,7 @@ import {
   FiPackage,
   FiDollarSign,
   FiTruck,
-  FiTrendingUp, 
+  FiTrendingUp,
   FiUsers,
   FiShield,
   // FiBuilding,
@@ -366,12 +366,12 @@ const Dashboard: React.FC = () => {
                     (a.type === 'order'
                       ? 'bg-indigo-500'
                       : a.type === 'payment'
-                      ? 'bg-emerald-500'
-                      : a.type === 'delivery'
-                      ? 'bg-orange-500'
-                      : a.type === 'customer'
-                      ? 'bg-purple-500'
-                      : 'bg-slate-400')
+                        ? 'bg-emerald-500'
+                        : a.type === 'delivery'
+                          ? 'bg-orange-500'
+                          : a.type === 'customer'
+                            ? 'bg-purple-500'
+                            : 'bg-slate-400')
                   }
                 />
                 <div className="flex-1">

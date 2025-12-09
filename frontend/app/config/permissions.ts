@@ -19,12 +19,13 @@ export const PAGE_PERMISSIONS: PagePermissions = {
   '/backup-export': ['admin'],
   '/delivery': ['admin', 'branch_manager', 'rider'],
   '/profile': ['admin', 'branch_manager', 'accountant', 'rider'], // Staff profile
-  
+
   // Customer-specific pages
   '/customer/dashboard': ['customer'],
   '/customer/orders': ['customer'],
   '/customer/profile': ['customer'],
   '/customer/place-order': ['customer'],
+  '/customer/payment': ['customer'],
   '/customer/payment-history': ['customer'],
 };
 
@@ -32,8 +33,9 @@ export const PAGE_PERMISSIONS: PagePermissions = {
 export const CUSTOMER_PAGES = [
   '/customer/dashboard',
   '/customer/orders',
-  '/customer/profile', 
+  '/customer/profile',
   '/customer/place-order',
+  '/customer/payment',
   '/customer/payment-history'
 ];
 
@@ -51,21 +53,21 @@ export const PUBLIC_PAGES = [
  */
 export function hasPagePermission(userRole: UserRole | null, path: string): boolean {
   if (!userRole) return false;
-  
+
   // Check if it's a public page
   if (PUBLIC_PAGES.some(page => path.startsWith(page))) {
     return true;
   }
-  
+
   // Find the most specific matching route
   const matchingRoute = Object.keys(PAGE_PERMISSIONS)
     .filter(route => path.startsWith(route))
     .sort((a, b) => b.length - a.length)[0]; // Get the longest matching route
-  
+
   if (!matchingRoute) {
     return false;
   }
-  
+
   return PAGE_PERMISSIONS[matchingRoute].includes(userRole);
 }
 
@@ -94,11 +96,11 @@ export function getDefaultRedirectPath(userRole: UserRole): string {
  */
 export function shouldRedirect(userRole: UserRole | null, currentPath: string): string | null {
   if (!userRole) return '/login';
-  
+
   // If user doesn't have permission to current page, redirect to their default page
   if (!hasPagePermission(userRole, currentPath)) {
-    return getDefaultRedirectPath(userRole);
+    return '/login';
   }
-  
+
   return null;
 }

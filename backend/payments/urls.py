@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     InitiatePaymentView,
+    ProcessPaymentView,
     PaymentSuccessView,
     PaymentFailureView,
     CheckPaymentStatusView,
@@ -11,6 +12,7 @@ from .views import (
 
 urlpatterns = [
     path('initiate/', InitiatePaymentView.as_view(), name='initiate_payment'),
+    path('process/<str:transaction_uuid>/', ProcessPaymentView.as_view(), name='process_payment'),
     path('success/', PaymentSuccessView.as_view(), name='payment_success'),
     path('failure/', PaymentFailureView.as_view(), name='payment_failure'),
     path('verify-esewa/', VerifyEsewaPaymentView.as_view(), name='verify_esewa_payment'),

@@ -20,6 +20,11 @@ const en = {
     roles: "Role Management",
     backup: "Backup & Export",
     delivery: "Delivery Dashboard",
+    myOrders: "My Orders",
+    placeOrder: "Place Order",
+    payment: "Payment",
+    profile: "Profile",
+    branchManagers: "Branch Managers"
   },
   dashboard: {
     title: "Admin Dashboard",
