@@ -6,12 +6,20 @@ import { useUpdateProfile } from "../../../queries/authQueries";
 import { useTranslation } from "react-i18next";
 import "../../../types/i18n";
 
+import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Added import
+
 export default function CustomerProfilePage() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { mutate: updateProfile, isPending: isUpdating, error: updateError } = useUpdateProfile();
   const [editMode, setEditMode] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  // Added visibility states
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [form, setForm] = useState({
     first_name: user?.first_name || "",
     last_name: user?.last_name || "",
@@ -218,38 +226,73 @@ export default function CustomerProfilePage() {
               <p className="text-gray-500 dark:text-gray-300 text-sm">{t('customer.profile.passwordModal.subtitle')}</p>
             </div>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              import {FaEye, FaEyeSlash} from 'react-icons/fa';
+
+              // ... (in component body)
+              const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+              const [showNewPassword, setShowNewPassword] = useState(false);
+              const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+              // ... (inside form render)
               <div>
                 <label className="block text-gray-700 dark:text-gray-200 text-sm mb-1 font-semibold">{t('customer.profile.passwordModal.currentPassword')}</label>
-                <input
-                  type="password"
-                  name="current"
-                  value={passwords.current}
-                  onChange={handlePasswordChange}
-                  className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    name="current"
+                    value={passwords.current}
+                    onChange={handlePasswordChange}
+                    className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    {showCurrentPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-gray-700 dark:text-gray-200 text-sm mb-1 font-semibold">{t('customer.profile.passwordModal.newPassword')}</label>
-                <input
-                  type="password"
-                  name="new"
-                  value={passwords.new}
-                  onChange={handlePasswordChange}
-                  className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    name="new"
+                    value={passwords.new}
+                    onChange={handlePasswordChange}
+                    className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-gray-700 dark:text-gray-200 text-sm mb-1 font-semibold">{t('customer.profile.passwordModal.confirmPassword')}</label>
-                <input
-                  type="password"
-                  name="confirm"
-                  value={passwords.confirm}
-                  onChange={handlePasswordChange}
-                  className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirm"
+                    value={passwords.confirm}
+                    onChange={handlePasswordChange}
+                    className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
               <div className="flex gap-2 mt-4 justify-center">
                 <button

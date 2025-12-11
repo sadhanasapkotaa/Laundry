@@ -48,6 +48,7 @@ export default function RouteProtection({
     if (path.startsWith("/backup-export")) return "backup-export";
     if (path.startsWith("/delivery")) return "delivery";
     if (path.startsWith("/customer/dashboard")) return "customer-dashboard";
+    if (path.startsWith("/customer/profile")) return "customer-profile";
     if (path.startsWith("/customer")) return "customer";
     if (path.startsWith("/profile")) return "profile";
     return "dashboard";
@@ -107,6 +108,7 @@ export default function RouteProtection({
       "customer": "/customer/orders",
       "customer-dashboard": "/customer/dashboard",
       "profile": "/profile",
+      "customer-profile": "/customer/profile",
     };
 
     const route = pageRoutes[page];

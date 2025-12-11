@@ -16,6 +16,8 @@ export default function OrderPaymentSuccessPage() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
+
         const fetchPaymentReceipt = async (attempt = 0) => {
             try {
                 const transactionUuid = searchParams.get('transaction_uuid');
@@ -48,7 +50,7 @@ export default function OrderPaymentSuccessPage() {
                         if (response.status === 503 && attempt < MAX_RETRIES) {
                             console.log(`Verification returned 503, retrying (attempt ${attempt + 1}/${MAX_RETRIES})...`);
                             setTimeout(() => {
-                                fetchPaymentReceipt(attempt + 1);
+                                if (isMounted) fetchPaymentReceipt(attempt + 1);
                             }, 2000);
                             return;
                         }
@@ -58,7 +60,10 @@ export default function OrderPaymentSuccessPage() {
                         if (result.success) {
                             // If verification returns a full receipt (it should), use it
                             if (result.payment) {
-                                setPaymentData(result.payment);
+                                if (isMounted) {
+                                    setPaymentData(result.payment);
+                                    setIsLoading(false);
+                                }
                             } else {
                                 // Fallback to fetching receipt if verify only returned success
                                 const receiptResponse = await apiRequest(`/payments/process/${transaction_uuid}/`, {
@@ -66,25 +71,39 @@ export default function OrderPaymentSuccessPage() {
                                 });
                                 const receiptResult = await receiptResponse.json();
                                 if (receiptResult.success) {
-                                    setPaymentData(receiptResult.payment);
+                                    if (isMounted) {
+                                        setPaymentData(receiptResult.payment);
+                                        setIsLoading(false);
+                                    }
                                 } else {
-                                    setError(receiptResult.error || 'Failed to fetch payment details');
+                                    if (isMounted) {
+                                        setError(receiptResult.error || 'Failed to fetch payment details');
+                                        setIsLoading(false);
+                                    }
                                 }
                             }
                         } else {
-                            setError(result.error || 'Payment verification failed');
+                            if (isMounted) {
+                                setError(result.error || 'Payment verification failed');
+                                setIsLoading(false);
+                            }
                         }
                     } catch (e) {
                         console.error('Error processing eSewa data:', e);
-                        setError('Invalid payment data received from payment gateway');
+                        if (isMounted) {
+                            setError('Invalid payment data received from payment gateway');
+                            setIsLoading(false);
+                        }
                     }
                     return;
                 }
 
                 // Case 2: Handle existing flow with transaction_uuid
                 if (!transactionUuid) {
-                    setError('No transaction ID found in URL. Please check if you were redirected properly from the payment gateway.');
-                    setIsLoading(false);
+                    if (isMounted) {
+                        setError('No transaction ID found in URL. Please check if you were redirected properly from the payment gateway.');
+                        setIsLoading(false);
+                    }
                     return;
                 }
 
@@ -96,7 +115,7 @@ export default function OrderPaymentSuccessPage() {
                 if (response.status === 503 && attempt < MAX_RETRIES) {
                     console.log(`Receipt fetch returned 503, retrying (attempt ${attempt + 1}/${MAX_RETRIES})...`);
                     setTimeout(() => {
-                        fetchPaymentReceipt(attempt + 1);
+                        if (isMounted) fetchPaymentReceipt(attempt + 1);
                     }, 2000);
                     return;
                 }
@@ -104,33 +123,30 @@ export default function OrderPaymentSuccessPage() {
                 const result = await response.json();
 
                 if (result.success) {
-                    setPaymentData(result.payment);
+                    if (isMounted) {
+                        setPaymentData(result.payment);
+                        setIsLoading(false);
+                    }
                 } else {
-                    setError(result.error || 'Failed to fetch payment details. Please try refreshing the page or contact support.');
+                    if (isMounted) {
+                        setError(result.error || 'Failed to fetch payment details. Please try refreshing the page or contact support.');
+                        setIsLoading(false);
+                    }
                 }
             } catch (err) {
                 console.error('Error fetching payment receipt:', err);
-                setError('Failed to load payment details. Please try refreshing the page or contact support.');
-            } finally {
-                // Only stop loading if we are NOT retrying
-                if (!(attempt < MAX_RETRIES)) {
+                if (isMounted) {
+                    setError('Failed to load payment details. Please try refreshing the page or contact support.');
                     setIsLoading(false);
                 }
-                // Also stop loading if we found data or hit error (handled inside logic above but need check)
-                // Actually, logic is messy with returns. Let's fix loading state:
-                // If we are retrying, we return early, so we don't hit finally block?
-                // Wait, async function returns promise. 
-                // Using recursion with setTimeout breaks the promise chain slightly if not careful, 
-                // but since this is trigger by useEffect and uses state setters, it's fine.
             }
         };
 
-        // Helper to handle loading state around retries
-        const run = async () => {
-            await fetchPaymentReceipt(0);
-        };
-        run();
+        fetchPaymentReceipt(0);
 
+        return () => {
+            isMounted = false;
+        };
     }, [searchParams]);
 
     // Update isLoading handling to properly reflect retry state if needed, 

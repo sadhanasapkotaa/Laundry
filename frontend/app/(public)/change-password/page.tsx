@@ -5,10 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useChangePassword } from '../../queries/authQueries';
 import { ChangePasswordRequest } from '../../types/auth';
 
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
+
 const ChangePasswordPage = () => {
   const router = useRouter();
   const { mutate: changePassword, isPending, error, isSuccess } = useChangePassword();
-  
+
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [formData, setFormData] = useState<ChangePasswordRequest>({
     old_password: '',
     new_password: '',
@@ -24,7 +30,7 @@ const ChangePasswordPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.new_password !== formData.confirm_password) {
       alert('New passwords do not match');
       return;
@@ -56,46 +62,73 @@ const ChangePasswordPage = () => {
               <label htmlFor="old_password" className="block text-sm font-medium text-gray-700">
                 Current Password
               </label>
-              <input
-                id="old_password"
-                name="old_password"
-                type="password"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Current Password"
-                value={formData.old_password}
-                onChange={handleChange}
-              />
+              <div className="relative mt-1">
+                <input
+                  id="old_password"
+                  name="old_password"
+                  type={showOldPassword ? "text" : "password"}
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm pr-10"
+                  placeholder="Current Password"
+                  value={formData.old_password}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                  onClick={() => setShowOldPassword(!showOldPassword)}
+                >
+                  {showOldPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             <div>
               <label htmlFor="new_password" className="block text-sm font-medium text-gray-700">
                 New Password
               </label>
-              <input
-                id="new_password"
-                name="new_password"
-                type="password"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="New Password"
-                value={formData.new_password}
-                onChange={handleChange}
-              />
+              <div className="relative mt-1">
+                <input
+                  id="new_password"
+                  name="new_password"
+                  type={showNewPassword ? "text" : "password"}
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm pr-10"
+                  placeholder="New Password"
+                  value={formData.new_password}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             <div>
               <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700">
                 Confirm New Password
               </label>
-              <input
-                id="confirm_password"
-                name="confirm_password"
-                type="password"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Confirm New Password"
-                value={formData.confirm_password}
-                onChange={handleChange}
-              />
+              <div className="relative mt-1">
+                <input
+                  id="confirm_password"
+                  name="confirm_password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm pr-10"
+                  placeholder="Confirm New Password"
+                  value={formData.confirm_password}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
           </div>
 

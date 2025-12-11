@@ -65,15 +65,18 @@ export default function CustomerOrdersPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case "pending pickup":
+      case "to be delivered":
+      case "out_for_delivery":
+      case "delivered": // Keep for backward compatibility if needed, or remove
+        return <FiTruck className="text-purple-500" />;
       case "pending":
         return <FiClock className="text-yellow-500" />;
-      case "processing":
+      case "in progress":
+      case "processing": // Keep for backward compatibility
         return <FiPackage className="text-blue-500" />;
       case "ready":
         return <FiCheck className="text-green-500" />;
-      case "delivered":
-      case "out_for_delivery":
-        return <FiTruck className="text-purple-500" />;
       case "completed":
         return <FiCheck className="text-green-500" />;
       default:
@@ -83,12 +86,16 @@ export default function CustomerOrdersPage() {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case "pending pickup":
+        return t('customer.orders.status.pendingPickup', 'Pending Pickup');
       case "pending":
         return t('customer.orders.status.pending');
+      case "in progress":
       case "processing":
         return t('customer.orders.status.processing');
       case "ready":
         return t('customer.orders.status.ready');
+      case "to be delivered":
       case "delivered":
       case "out_for_delivery":
         return t('customer.orders.status.outForDelivery');

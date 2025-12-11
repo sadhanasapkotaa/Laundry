@@ -33,7 +33,7 @@ import PaymentService from "../../services/paymentService";
 import { orderAPI, Order as BackendOrder, OrderItem as OrderItemType } from "../../services/orderService";
 import { useAuth } from "../../contexts/AuthContext";
 
-type OrderStatus = "pending" | "processing" | "ready" | "delivered" | "cancelled";
+type OrderStatus = "pending pickup" | "pending" | "in progress" | "to be delivered" | "completed" | "cancelled";
 
 // Frontend display interface (mapped from backend)
 interface DisplayOrder {
@@ -57,21 +57,21 @@ const STATUS_META: Record<
   OrderStatus,
   { color: string; labelKey: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
 > = {
+  'pending pickup': { color: "bg-purple-100 text-purple-800", labelKey: "orders.status.pendingPickup", Icon: FaTruck },
   pending: { color: "bg-blue-100 text-blue-800", labelKey: "orders.status.pending", Icon: FaBoxOpen },
-  processing: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.status.processing", Icon: FaClock },
-  ready: { color: "bg-green-100 text-green-800", labelKey: "orders.status.ready", Icon: FaCheckCircle },
-  delivered: { color: "bg-gray-100 text-gray-800", labelKey: "orders.status.delivered", Icon: FaTruck },
+  'in progress': { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.status.processing", Icon: FaClock },
+  'to be delivered': { color: "bg-gray-100 text-gray-800", labelKey: "orders.status.outForDelivery", Icon: FaTruck },
+  completed: { color: "bg-green-100 text-green-800", labelKey: "orders.status.completed", Icon: FaCheckCircle },
   cancelled: { color: "bg-red-100 text-red-800", labelKey: "orders.status.cancelled", Icon: FaExclamationTriangle },
 };
 
 const PAYMENT_STATUS_META: Record<
-  'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed',
+  'pending' | 'partially_paid' | 'paid' | 'failed',
   { color: string; labelKey: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
 > = {
   pending: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.paymentStatus.pending", Icon: FaClock },
   partially_paid: { color: "bg-blue-100 text-blue-800", labelKey: "orders.paymentStatus.partiallyPaid", Icon: FaSpinner },
   paid: { color: "bg-green-100 text-green-800", labelKey: "orders.paymentStatus.paid", Icon: FaCheckCircle },
-  unpaid: { color: "bg-red-100 text-red-800", labelKey: "orders.paymentStatus.unpaid", Icon: FaExclamationTriangle },
   failed: { color: "bg-red-100 text-red-800", labelKey: "orders.paymentStatus.failed", Icon: FaExclamationTriangle },
 };
 
@@ -186,10 +186,11 @@ export default function OrderManagement(): JSX.Element {
 
   const statusCounts = useMemo(() => {
     const map: Record<OrderStatus, number> = {
+      'pending pickup': 0,
       pending: 0,
-      processing: 0,
-      ready: 0,
-      delivered: 0,
+      'in progress': 0,
+      'to be delivered': 0,
+      completed: 0,
       cancelled: 0,
     };
     orders.forEach((o) => {
@@ -378,7 +379,7 @@ export default function OrderManagement(): JSX.Element {
     }
   };
 
-  const handleChangePaymentStatus = async (orderId: string, newPaymentStatus: 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed') => {
+  const handleChangePaymentStatus = async (orderId: string, newPaymentStatus: 'pending' | 'partially_paid' | 'paid' | 'failed') => {
     try {
       // Find the order to get its backend ID
       const order = orders.find(o => o.id === orderId);
@@ -411,7 +412,7 @@ export default function OrderManagement(): JSX.Element {
   };
 
   // Payment status badge
-  const PaymentStatusBadge: React.FC<{ status: 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed' }> = ({ status }) => {
+  const PaymentStatusBadge: React.FC<{ status: 'pending' | 'partially_paid' | 'paid' | 'failed' }> = ({ status }) => {
     const meta = PAYMENT_STATUS_META[status];
     const Icon = meta.Icon;
     return (
@@ -480,10 +481,11 @@ export default function OrderManagement(): JSX.Element {
             aria-label={t("orders.filterByStatus", "Filter by status")}
           >
             <option value="all">{t("orders.filter.all", "All Status")}</option>
+            <option value="pending pickup">Pending Pickup</option>
             <option value="pending">{t("orders.status.pending")}</option>
-            <option value="processing">{t("orders.status.processing")}</option>
-            <option value="ready">{t("orders.status.ready")}</option>
-            <option value="delivered">{t("orders.status.delivered")}</option>
+            <option value="in progress">{t("orders.status.processing")}</option>
+            <option value="to be delivered">{t("orders.status.outForDelivery")}</option>
+            <option value="completed">{t("orders.status.completed")}</option>
             <option value="cancelled">{t("orders.status.cancelled")}</option>
           </select>
 
@@ -497,7 +499,6 @@ export default function OrderManagement(): JSX.Element {
             <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
             <option value="partially_paid">{t("orders.paymentStatus.partiallyPaid", "Partially Paid")}</option>
             <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
-            <option value="unpaid">{t("orders.paymentStatus.unpaid", "Unpaid")}</option>
             <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
           </select>
 
@@ -593,27 +594,27 @@ export default function OrderManagement(): JSX.Element {
                         aria-label={t("orders.changeStatus", "Change status")}
                         className="px-2 py-1 border rounded-md text-xs"
                       >
+                        <option value="pending pickup">Pending Pickup</option>
                         <option value="pending">{t("orders.status.pending")}</option>
-                        <option value="processing">{t("orders.status.processing")}</option>
-                        <option value="ready">{t("orders.status.ready")}</option>
-                        <option value="delivered">{t("orders.status.delivered")}</option>
+                        <option value="in progress">{t("orders.status.processing")}</option>
+                        <option value="to be delivered">{t("orders.status.outForDelivery")}</option>
+                        <option value="completed">{t("orders.status.completed")}</option>
                         <option value="cancelled">{t("orders.status.cancelled")}</option>
                       </select>
                     </div>
                   </td>
                   <td className="px-3 py-3 align-top">
                     <div className="flex flex-col gap-2">
-                      <PaymentStatusBadge status={order.paymentStatus as 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed'} />
+                      <PaymentStatusBadge status={order.paymentStatus as 'pending' | 'partially_paid' | 'paid' | 'failed'} />
                       <select
                         value={order.paymentStatus}
-                        onChange={(e) => handleChangePaymentStatus(order.id, e.target.value as 'pending' | 'partially_paid' | 'paid' | 'unpaid' | 'failed')}
+                        onChange={(e) => handleChangePaymentStatus(order.id, e.target.value as 'pending' | 'partially_paid' | 'paid' | 'failed')}
                         aria-label={t("orders.changePaymentStatus", "Change payment status")}
                         className="px-2 py-1 border rounded-md text-xs"
                       >
                         <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
                         <option value="partially_paid">{t("orders.paymentStatus.partiallyPaid", "Partially Paid")}</option>
                         <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
-                        <option value="unpaid">{t("orders.paymentStatus.unpaid", "Unpaid")}</option>
                         <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
                       </select>
                     </div>
@@ -659,7 +660,7 @@ export default function OrderManagement(): JSX.Element {
 
       {/* Status summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {(["pending", "processing", "ready", "delivered", "cancelled"] as OrderStatus[]).map((k, idx) => (
+        {(["pending pickup", "pending", "in progress", "to be delivered", "completed", "cancelled"] as OrderStatus[]).map((k, idx) => (
           <div key={k} className="p-4 border rounded-lg bg-white shadow-sm">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">{t(STATUS_META[k].labelKey)}</div>

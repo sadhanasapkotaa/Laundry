@@ -148,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
     },
     // Profile for all roles (always present)
     {
-      id: "profile",
+      id: (user && user.role === "customer") ? "customer-profile" : "profile",
       icon: FaUser,
       label: t("navigation.profile") || "Profile",
       // Use /profile for staff/admin, /customer/profile for customer

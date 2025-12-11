@@ -6,10 +6,13 @@ import { useLogin } from '../queries/authQueries';
 import { LoginRequest } from '../types/auth';
 import { getDefaultRedirectPath } from '../config/permissions';
 
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
+
 const Login = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { mutate: login, isPending, error } = useLogin();
+    const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState<LoginRequest>({
         email: '',
@@ -78,17 +81,26 @@ const Login = () => {
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                                 Password
                             </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Password"
-                                value={formData.password}
-                                onChange={handleChange}
-                            />
+                            <div className="relative mt-1">
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type={showPassword ? "text" : "password"}
+                                    autoComplete="current-password"
+                                    required
+                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm pr-10"
+                                    placeholder="Password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
