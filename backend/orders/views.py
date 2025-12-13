@@ -39,6 +39,9 @@ class OrderCreateView(generics.CreateAPIView):
                 # Check for advance payments and apply them to this order
                 self._apply_advance_payments(order, request.user)
                 
+                # Assign to rider
+                self._assign_to_rider(order)
+
                 # Use OrderSerializer for response (i has proper SerializerMethodField for dates)
                 response_serializer = OrderSerializer(order, context={'request': request})
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
@@ -47,6 +50,30 @@ class OrderCreateView(generics.CreateAPIView):
             import traceback
             logger.error(traceback.format_exc())
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _assign_to_rider(self, order):
+        """
+        Assigns the order's deliveries to the first available rider.
+        """
+        import logging
+        from django.contrib.auth import get_user_model
+        
+        logger = logging.getLogger(__name__)
+        User = get_user_model()
+        
+        # Find a rider (simplest logic: first one found)
+        # In a real app, this would be more complex (location based, load balancing, etc.)
+        rider = User.objects.filter(role='rider').first()
+        
+        if rider:
+            # Assign to all deliveries associated with this order
+            deliveries = Delivery.objects.filter(order=order)
+            updated_count = deliveries.update(delivery_person=rider)
+            logger.info(f"Assigned {updated_count} deliveries for Order {order.order_id} to Rider {rider.email}")
+            
+            # Notify rider (TODO: Implement notification system)
+        else:
+            logger.warning(f"No riders found to assign Order {order.order_id}")
     
     def _apply_advance_payments(self, order, user):
         """
@@ -205,8 +232,11 @@ class OrderStatsView(generics.GenericAPIView):
         
         stats = orders.aggregate(
             total_orders=Count('order_id'),
-            active_orders=Count('order_id', filter=Q(status__in=['pending pickup', 'pending', 'in progress', 'to be delivered'])),
-            completed_orders=Count('order_id', filter=Q(status='completed')),
+            active_orders=Count('order_id', filter=Q(status__in=[
+                'pending pickup', 'picked up', 'sent to wash', 'in wash', 
+                'washed', 'picked by client', 'pending delivery', 'dropped by user'
+            ])),
+            completed_orders=Count('order_id', filter=Q(status='completed') | Q(status='delivered')),
             pending_payments_count=Count('order_id', filter=Q(payment_status='pending') | Q(payment_status='partially_paid')),
         )
         
@@ -287,9 +317,18 @@ class OrderStatsView(generics.GenericAPIView):
 class DeliveryListView(generics.ListAPIView):
     """View to list all deliveries."""
     # pylint: disable=no-member
-    queryset = Delivery.objects.all()
     serializer_class = DeliverySerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Return deliveries based on user role.
+        Riders see only their assigned deliveries.
+        """
+        user = self.request.user
+        if getattr(user, 'role', None) == 'rider':
+            return Delivery.objects.filter(delivery_person=user).order_by('-delivery_date')
+        return Delivery.objects.all().order_by('-delivery_date')
 
 class DeliveryCreateView(generics.CreateAPIView):
     """View to create a new delivery."""
@@ -311,6 +350,26 @@ class DeliveryUpdateView(generics.UpdateAPIView):
     queryset = Delivery.objects.all()
     serializer_class = DeliverySerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        """
+        Update delivery status and related order status if applicable.
+        """
+        instance = serializer.save()
+        
+        # If delivery type is pickup and status is delivered, update order status to 'picked up'
+        if instance.delivery_type == 'pickup' and instance.status == 'delivered':
+            order = instance.order
+            # Only update if order is in 'pending pickup' state to avoid overwriting other statuses
+            if order.status == 'pending pickup':
+                order.status = 'picked up'
+                order.save()
+                
+        # If delivery type is drop (delivery to customer) and status is delivered, update order status to 'delivered'
+        if instance.delivery_type == 'drop' and instance.status == 'delivered':
+            order = instance.order
+            order.status = 'delivered'
+            order.save()
 
 class DeliveryDeleteView(generics.DestroyAPIView):
     """View to delete an existing delivery."""

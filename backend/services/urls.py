@@ -1,15 +1,36 @@
 from django.urls import path
 from .views import (
     ServiceViewSet, WashTypeViewSet, DeliveryTypeViewSet,
-    ServiceCostViewSet, IndividualClothViewSet, BulkClothViewSet
+    ServiceCostViewSet, IndividualClothViewSet, BulkClothViewSet,
+    SystemSettingsView, ClothNameViewSet, ClothTypeViewSet, PricingRuleViewSet
 )
 
 urlpatterns = [
-    # Services
+    # System Settings (singleton)
+    path('settings/', SystemSettingsView.as_view(), name='system-settings'),
+
+    # Wash Types
+    path('wash-types/', WashTypeViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('wash-types/<int:pk>/', WashTypeViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'})),
+
+    # Cloth Names
+    path('cloth-names/', ClothNameViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('cloth-names/<int:pk>/', ClothNameViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'})),
+
+    # Cloth Types (materials)
+    path('cloth-types/', ClothTypeViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('cloth-types/<int:pk>/', ClothTypeViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'})),
+
+    # Pricing Rules
+    path('pricing-rules/', PricingRuleViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('pricing-rules/<int:pk>/', PricingRuleViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'})),
+    path('pricing-rules/lookup/', PricingRuleViewSet.as_view({'get': 'lookup'})),
+
+    # Services (legacy)
     path('services/', ServiceViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('services/<uuid:pk>/', ServiceViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
-    # Wash Types
+    # Wash Types (legacy path)
     path('washtypes/', WashTypeViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('washtypes/<int:pk>/', WashTypeViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
@@ -29,3 +50,4 @@ urlpatterns = [
     path('bulkcloths/', BulkClothViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('bulkcloths/<int:pk>/', BulkClothViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 ]
+

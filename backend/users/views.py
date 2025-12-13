@@ -340,3 +340,24 @@ class UpdateProfileView(GenericAPIView):
                     'error': str(e)
                 }, status=status.HTTP_400_BAD_REQUEST
             )
+
+from rest_framework import generics
+from .serializers import UserListSerializer
+
+class UserListView(generics.ListAPIView):
+    """
+    View to list users.
+    Supports filtering by role via query parameter.
+    """
+    serializer_class = UserListSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Return users filtered by role if provided.
+        """
+        queryset = User.objects.all()
+        role = self.request.query_params.get('role', None)
+        if role:
+            queryset = queryset.filter(role=role)
+        return queryset

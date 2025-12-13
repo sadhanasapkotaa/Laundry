@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FaCreditCard, FaWallet, FaHistory, FaChevronLeft, FaChevronRight, FaSpinner } from "react-icons/fa";
+import { FaCreditCard, FaHistory, FaChevronLeft, FaChevronRight, FaSpinner, FaRegCreditCard } from "react-icons/fa";
 import { branchAPI, Branch } from "../../../services/branchService";
 import { orderAPI, OrderStats } from "../../../services/orderService";
 import { PaymentService, PaymentData } from "../../../services/paymentService";
@@ -71,10 +71,6 @@ export default function CustomerPaymentPage() {
 
             setPayments(paymentsResponse.payments || []);
             setTotalPages(paymentsResponse.pagination?.total_pages || 1);
-            console.log('[Payment Page] Loaded payments:', paymentsResponse.payments?.length || 0, 'payments');
-            if (paymentsResponse.payments && paymentsResponse.payments.length > 0) {
-                console.log('[Payment Page] Sample payment:', paymentsResponse.payments[0]);
-            }
         } catch (err) {
             console.error('Error fetching payment data:', err);
             setError('Failed to load payment data');
@@ -155,359 +151,201 @@ export default function CustomerPaymentPage() {
         }
     };
 
-    const handlePayAll = () => {
-        handlePayment(totalPendingAmount);
-    };
-
-    const handlePayPartial = () => {
-        const amount = parseFloat(paymentAmount);
-        if (isNaN(amount) || amount <= 0) {
-            setError('Please enter a valid amount');
-            return;
-        }
-        handlePayment(amount);
-    };
-
     const getStatusBadge = (status: string) => {
+        const baseClass = "px-2.5 py-0.5 rounded-full text-xs font-semibold";
         const statusStyles: Record<string, string> = {
-            'COMPLETE': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-            'PENDING': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            'FAILED': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-            'CANCELED': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400',
+            'COMPLETE': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+            'PENDING': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+            'FAILED': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+            'CANCELED': 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400',
         };
-        return statusStyles[status] || statusStyles['PENDING'];
-    };
-
-    const getPaymentTypeLabel = (type: string) => {
-        const labels: Record<string, string> = {
-            'esewa': 'eSewa',
-            'cash': 'Cash',
-            'bank': 'Bank Transfer',
-        };
-        return labels[type] || type;
-    };
-
-    const getPaymentSourceLabel = (source?: string) => {
-        if (source === 'order') return 'Order Placement';
-        if (source === 'payment_page') return 'Post-Order Payment';
-        return 'Payment';
+        return `${baseClass} ${statusStyles[status] || statusStyles['PENDING']}`;
     };
 
     if (isLoading) {
         return (
-            <div className="space-y-6">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 animate-pulse">
-                    <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-                    <div className="h-16 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
-                </div>
+            <div className="min-h-[50vh] flex flex-col items-center justify-center text-gray-400">
+                <FaSpinner className="h-8 w-8 animate-spin mb-4 text-blue-500" />
+                <p>Loading payment details...</p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-fadeIn max-w-5xl mx-auto">
             {/* Header */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                    <FaWallet className="text-blue-600" />
-                    Payment Portal
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                    Payments
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Manage your pending payments and view payment history
+                <p className="text-gray-500 dark:text-gray-400 mt-2">
+                    Manage your balance and view transaction history
                 </p>
             </div>
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-red-700 dark:text-red-400">{error}</p>
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-red-700 dark:text-red-300">
+                    {error}
                 </div>
             )}
 
-            {/* Pending Amount Card */}
-            <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg shadow-lg p-6 text-white">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <p className="text-blue-100 text-sm">Total Pending Amount</p>
-                        <p className="text-4xl font-bold mt-1">₨ {totalPendingAmount.toLocaleString()}</p>
-                        <p className="text-blue-200 text-sm mt-2">{pendingPaymentsCount} order(s) pending payment</p>
-                    </div>
-                    <div className="p-4 bg-white/20 rounded-full">
-                        <FaCreditCard className="h-10 w-10" />
-                    </div>
-                </div>
-
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <FaWallet /> Make a Payment
-                    </h3>
-
-                    {/* Branch Selection */}
-                    <div className="mb-4">
-                        <label className="block text-sm text-blue-100 mb-1">Select Branch</label>
-                        <select
-                            value={selectedBranch || ''}
-                            onChange={(e) => setSelectedBranch(Number(e.target.value))}
-                            className="w-full bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 [&>option]:text-gray-900"
-                        >
-                            <option value="" disabled>Select a branch</option>
-                            {branches.map(branch => (
-                                <option key={branch.id} value={branch.id}>
-                                    {branch.name} ({branch.city})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Amount Input */}
-                    <div className="mb-4">
-                        <label className="block text-sm text-blue-100 mb-1">Payment Amount (Rs.)</label>
-                        <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={paymentAmount}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                // Prevent negative values
-                                if (parseFloat(value) < 0) {
-                                    setError('Amount cannot be negative');
-                                    return;
-                                }
-                                setPaymentAmount(value);
-                                setError(null);
-                            }}
-                            placeholder="Enter amount to pay"
-                            className="w-full bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
-                        />
-                        {selectedBranch && getSelectedBranchPendingAmount() > 0 && (
-                            <p className="text-blue-100 text-xs mt-1">
-                                Branch pending: Rs. {getSelectedBranchPendingAmount().toLocaleString()}
-                            </p>
-                        )}
-                        {Number(paymentAmount) > totalPendingAmount && totalPendingAmount > 0 && (
-                            <p className="text-yellow-300 text-xs mt-1">
-                                ⚠️ Amount exceeds total pending balance (Rs. {totalPendingAmount.toLocaleString()})
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Pay Button */}
-                    <button
-                        onClick={() => {
-                            const amount = parseFloat(paymentAmount);
-                            if (!isNaN(amount)) {
-                                handlePayment(amount);
-                            } else {
-                                setError('Please enter a valid amount');
-                            }
-                        }}
-                        disabled={isProcessing || !paymentAmount || !selectedBranch}
-                        className="w-full py-3 px-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                    >
-                        {isProcessing ? (
-                            <FaSpinner className="animate-spin" />
-                        ) : (
-                            <>
-                                <FaCreditCard />
-                                Pay via eSewa
-                            </>
-                        )}
-                    </button>
-
-                    {totalPendingAmount > 0 && (
-                        <button
-                            onClick={() => {
-                                setPaymentAmount(totalPendingAmount.toString());
-                            }}
-                            className="w-full mt-3 py-2 text-sm text-blue-100 hover:text-white hover:bg-white/10 rounded transition-colors"
-                        >
-                            Pay Full Pending Amount (Rs. {totalPendingAmount})
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Branch-wise Pending Amount */}
-            {branchPendingAmounts && branchPendingAmounts.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {branchPendingAmounts.map((branchStats) => (
-                        <div key={branchStats.branch_id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-                            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{branchStats.branch_name}</h3>
-                            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                ₨ {branchStats.total_pending.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Pending orders only
-                            </p>
-                            <button
-                                onClick={() => {
-                                    setSelectedBranch(branchStats.branch_id);
-                                    setPaymentAmount(branchStats.total_pending.toString());
-                                }}
-                                className="text-sm text-blue-600 dark:text-blue-400 mt-2 hover:underline"
-                            >
-                                Pay this amount
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-            
-            {/* Explanation for users */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <h3 className="font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Payment Information
-                </h3>
-                <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
-                    The amounts shown above represent pending payments for orders at each branch. 
-                    If you've made advance payments that aren't applied to specific orders, 
-                    they will appear as credit in your payment history below.
-                </p>
-            </div>
-
-            {/* Payment History */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <FaHistory className="text-gray-500" />
-                        Payment History
-                    </h2>
-                </div>
-
-                {payments.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <FaHistory className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                        <p className="font-medium">No payment history found</p>
-                        <p className="text-sm mt-2">Your completed payments will appear here</p>
-                    </div>
-                ) : (
-                    <>
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                            Date
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                            Type
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                            Method
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                            Branch
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                            Amount
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {payments.map((payment) => (
-                                        <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
-                                                <div>
-                                                    {new Date(payment.created_at).toLocaleDateString('en-US', {
-                                                        year: 'numeric',
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                    })}
-                                                </div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-500 font-mono">
-                                                    {payment.transaction_uuid.substring(0, 12)}...
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 text-sm">
-                                                {payment.payment_source === 'order' ? (
-                                                    <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 rounded text-xs font-medium">
-                                                        📦 Order Placement
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded text-xs font-medium">
-                                                        💰 Post-Order
-                                                    </span>
-                                                )}
-                                                {payment.orders_count && payment.orders_count > 0 && (
-                                                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                                        {payment.orders_count} order{payment.orders_count > 1 ? 's' : ''}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
-                                                {getPaymentTypeLabel(payment.payment_type)}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
-                                                {payment.branch_name || 'N/A'}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                <div>₨ {payment.total_amount.toLocaleString()}</div>
-                                                {payment.is_advance_payment ? (
-                                                    <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                                                        Advance payment (no applicable orders)
-                                                    </div>
-                                                ) : payment.orders_count && payment.orders_count > 0 ? (
-                                                    payment.excess_amount && payment.excess_amount > 0 ? (
-                                                        <div className="text-xs mt-1 space-y-0.5">
-                                                            <div className="text-green-600 dark:text-green-400">
-                                                                Applied: ₨ {payment.amount_applied?.toLocaleString() ?? 0}
-                                                            </div>
-                                                            <div className="text-blue-600 dark:text-blue-400 font-medium">
-                                                                Credit: ₨ {payment.excess_amount.toLocaleString()}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                                            Fully applied to {payment.orders_count} order{payment.orders_count > 1 ? 's' : ''}
-                                                        </div>
-                                                    )
-                                                ) : null}
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(payment.status)}`}>
-                                                    {payment.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Page {currentPage} of {totalPages}
-                                </p>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                                    >
-                                        <FaChevronLeft className="h-3 w-3" />
-                                        Previous
-                                    </button>
-                                    <button
-                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                                    >
-                                        Next
-                                        <FaChevronRight className="h-3 w-3" />
-                                    </button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Col: Payment Action */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Main Payment Card */}
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                        <div className="p-6 md:p-8">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pending Balance</h2>
+                                    <p className="text-4xl font-bold text-gray-900 dark:text-gray-100 mt-2">₨ {totalPendingAmount.toLocaleString()}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        Across {pendingPaymentsCount} pending order{pendingPaymentsCount !== 1 && 's'}
+                                    </p>
+                                </div>
+                                <div className="hidden md:block p-4 bg-gray-50 dark:bg-gray-700/50 rounded-full">
+                                    <FaRegCreditCard className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                                 </div>
                             </div>
-                        )}
-                    </>
-                )}
+
+                            <div className="space-y-6">
+                                {/* Branch Selection */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Branch</label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedBranch || ''}
+                                            onChange={(e) => setSelectedBranch(Number(e.target.value))}
+                                            className="w-full bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+                                        >
+                                            <option value="" disabled>Select a branch</option>
+                                            {branches.map(branch => (
+                                                <option key={branch.id} value={branch.id}>
+                                                    {branch.name} ({branch.city})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                                            <FaChevronRight className="rotate-90 w-3 h-3" />
+                                        </div>
+                                    </div>
+                                    {selectedBranch && getSelectedBranchPendingAmount() > 0 && (
+                                        <p className="text-xs text-gray-500 mt-2 ml-1">
+                                            Pending at this branch: <span className="font-medium text-gray-900 dark:text-gray-100">Rs. {getSelectedBranchPendingAmount().toLocaleString()}</span>
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Amount Input */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Amount to Pay</label>
+                                    <div className="relative">
+                                        <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-500">₨</span>
+                                        <input
+                                            type="number"
+                                            value={paymentAmount}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (parseFloat(val) >= 0 || val === '') {
+                                                    setPaymentAmount(val);
+                                                    setError(null);
+                                                }
+                                            }}
+                                            placeholder="0.00"
+                                            className="w-full bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl pl-10 pr-4 py-3 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                        />
+                                    </div>
+                                    {totalPendingAmount > 0 && (
+                                        <div className="mt-2 text-right">
+                                            <button
+                                                onClick={() => setPaymentAmount(totalPendingAmount.toString())}
+                                                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                                            >
+                                                Pay Full Amount
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        const amount = parseFloat(paymentAmount);
+                                        if (!isNaN(amount)) handlePayment(amount);
+                                        else setError('Please enter a valid amount');
+                                    }}
+                                    disabled={isProcessing || !paymentAmount || !selectedBranch || parseFloat(paymentAmount) <= 0}
+                                    className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
+                                >
+                                    {isProcessing ? <FaSpinner className="animate-spin" /> : <FaCreditCard />}
+                                    Pay via eSewa
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Branch Breakdown (if needed) */}
+                    {branchPendingAmounts && branchPendingAmounts.length > 1 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {branchPendingAmounts.filter(b => b.total_pending > 0).map(b => (
+                                <div key={b.branch_id}
+                                    onClick={() => {
+                                        setSelectedBranch(b.branch_id);
+                                        setPaymentAmount(b.total_pending.toString());
+                                    }}
+                                    className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 cursor-pointer hover:border-blue-200 dark:hover:border-blue-800 transition-all group"
+                                >
+                                    <div className="text-xs text-gray-500 uppercase tracking-widest">{b.branch_name}</div>
+                                    <div className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1 group-hover:text-blue-600">₨ {b.total_pending.toLocaleString()}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Col: Recent Transactions */}
+                <div className="lg:col-span-1">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full max-h-[600px] flex flex-col">
+                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <FaHistory className="text-gray-400" /> Recent History
+                            </h3>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1 p-4 space-y-3 custom-scrollbar">
+                            {payments.length === 0 ? (
+                                <div className="text-center py-10 text-gray-400">
+                                    <p className="text-sm">No transactions yet</p>
+                                </div>
+                            ) : (
+                                payments.slice(0, 5).map(payment => (
+                                    <div key={payment.id} className="group p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors border border-transparent hover:border-gray-100 dark:hover:border-gray-700">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                {payment.payment_type === 'esewa' ? 'eSewa Payment' : 'Cash Payment'}
+                                            </div>
+                                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                                ₨ {payment.total_amount.toLocaleString()}
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-end">
+                                            <div className="text-xs text-gray-500">
+                                                {new Date(payment.created_at).toLocaleDateString()}
+                                                <div className="mt-0.5 opacity-75">{payment.branch_name}</div>
+                                            </div>
+                                            <span className={getStatusBadge(payment.status)}>{payment.status}</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800 rounded-b-2xl">
+                            <a href="/customer/payment-history" className="block w-full text-center text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                                View Full History
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

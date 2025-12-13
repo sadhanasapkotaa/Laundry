@@ -66,7 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       icon: FaBox,
       label: t("navigation.orders") || "Order Management",
       path: "/orders",
-      roles: ["admin", "branch_manager", "rider"], // Admin, Branch Managers, and Riders can manage orders
+      roles: ["admin", "branch_manager"], // Admin and Branch Managers can manage orders
     },
     {
       id: "place-orders",
@@ -124,6 +124,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       path: "/delivery",
       roles: ["admin", "branch_manager", "rider"], // Delivery management for these roles
     },
+
     // Customer-specific menu items
     {
       id: "customer-orders",

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt, FaPlus, FaSave } from "react-icons/fa";
+import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt, FaPlus, FaSave, FaStore, FaClock, FaCalendar, FaMinus } from "react-icons/fa";
 import { branchAPI, Branch } from "../../../services/branchService";
 import { addressAPI, UserAddress } from "../../../services/addressService";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -37,6 +37,13 @@ interface CartItem {
   price: number;
   unitPrice: number;
 }
+
+const TIME_SLOTS = [
+  { value: 'early_morning', label: 'Early Morning (6am - 9am)' },
+  { value: 'late_morning', label: 'Late Morning (9am - 12pm)' },
+  { value: 'early_afternoon', label: 'Early Afternoon (12pm - 3pm)' },
+  { value: 'late_afternoon', label: 'Late Afternoon (3pm - 6pm)' },
+];
 
 export default function CustomerPlaceOrderPage() {
   const router = useRouter();
@@ -84,7 +91,6 @@ export default function CustomerPlaceOrderPage() {
   const [saveDeliveryAddress, setSaveDeliveryAddress] = useState(false);
 
   const [errors, setErrors] = useState<string[]>([]);
-  const [isLoading] = useState(false);
 
   // Fetch saved addresses
   const fetchAddresses = useCallback(async () => {
@@ -121,18 +127,12 @@ export default function CustomerPlaceOrderPage() {
   const fetchBranches = useCallback(async () => {
     try {
       setBranchesLoading(true);
-      console.log('Starting to fetch branches...');
-
       const branchesArray = await branchAPI.list({ status: 'active' });
-      console.log('Fetched branches array:', branchesArray);
-      console.log('Number of branches:', branchesArray.length);
-
       setBranches(branchesArray);
 
       // Set first branch as default if available and no branch is selected
       if (branchesArray.length > 0 && !selectedBranch) {
         setSelectedBranch(branchesArray[0].id);
-        console.log('Auto-selected first branch:', branchesArray[0].name);
       }
     } catch (error: unknown) {
       console.error('Error fetching branches:', error);
@@ -299,24 +299,33 @@ export default function CustomerPlaceOrderPage() {
       if (!deliveryAddress) errs.push("Please provide delivery address.");
     }
 
+    // Helper for validation
+    const getSlotTime = (slot: string) => {
+      if (slot === 'early_morning') return '06:00';
+      if (slot === 'late_morning') return '09:00';
+      if (slot === 'early_afternoon') return '12:00';
+      if (slot === 'late_afternoon') return '15:00';
+      return '00:00';
+    };
+
     // Date validation
     const now = new Date();
     if (pickupEnabled && pickupDate && pickupTime) {
-      const pickupDateTime = new Date(`${pickupDate}T${pickupTime}`);
+      const pickupDateTime = new Date(`${pickupDate}T${getSlotTime(pickupTime)}`);
       if (pickupDateTime < now) {
         errs.push("Pickup date and time cannot be in the past.");
       }
     }
 
     if (deliveryEnabled && deliveryDate && deliveryTime) {
-      const deliveryDateTime = new Date(`${deliveryDate}T${deliveryTime}`);
+      const deliveryDateTime = new Date(`${deliveryDate}T${getSlotTime(deliveryTime)}`);
       if (deliveryDateTime < now) {
         errs.push("Delivery date and time cannot be in the past.");
       }
 
       // If both pickup and delivery are enabled, delivery should be after pickup
       if (pickupEnabled && pickupDate && pickupTime && !isUrgent) {
-        const pickupDateTime = new Date(`${pickupDate}T${pickupTime}`);
+        const pickupDateTime = new Date(`${pickupDate}T${getSlotTime(pickupTime)}`);
         const minDeliveryTime = new Date(pickupDateTime.getTime() + (3 * 24 * 60 * 60 * 1000)); // 3 days later
         if (deliveryDateTime < minDeliveryTime) {
           errs.push("Delivery must be at least 3 days after pickup (unless urgent service is selected).");
@@ -384,457 +393,487 @@ export default function CustomerPlaceOrderPage() {
 
   if (authLoading) {
     return (
-      <div className="max-w-3xl mx-auto p-6 bg-white shadow rounded">
-        <div className="text-center">Loading...</div>
+      <div className="flex h-[50vh] items-center justify-center text-gray-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-2"></div>
+        Loading auth...
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Order Form */}
-        <div className="lg:col-span-2">
-          <div className="bg-white shadow rounded p-6">
-            <h1 className="text-2xl font-bold mb-6">Place Your Order</h1>
+    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+            Place New Order
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-2">
+            Customize your laundry service
+          </p>
+        </div>
+      </div>
 
-            {errors.length > 0 && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded">
-                <h3 className="font-semibold text-red-800 mb-2">Please fix the following issues:</h3>
-                <ul className="list-disc list-inside text-red-700">
-                  {errors.map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Order Form (Left 2 Columns) */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {errors.length > 0 && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl">
+              <h3 className="font-semibold text-red-700 dark:text-red-400 mb-2">Please fix the following issues:</h3>
+              <ul className="list-disc list-inside text-red-600 dark:text-red-300 text-sm">
+                {errors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Branch Selection */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-4 text-gray-900 dark:text-gray-100">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg text-blue-600 dark:text-blue-400">
+                <FaStore />
               </div>
-            )}
+              <h2 className="text-lg font-bold">Select Branch</h2>
+            </div>
 
-            {/* Branch Selection */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Select Branch</h2>
-              <div className="border rounded-lg p-4 bg-gray-50">
-                {branchesLoading ? (
-                  <div className="text-blue-600">Loading branches...</div>
-                ) : (
-                  <>
-                    <select
-                      className="w-full border rounded px-3 py-2 mb-2"
-                      value={selectedBranch || ""}
-                      onChange={(e) => setSelectedBranch(e.target.value ? Number(e.target.value) : null)}
-                    >
-                      <option value="">Select a branch</option>
-                      {branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name} - {branch.city}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedBranchInfo && (
-                      <div className="text-sm text-gray-600 flex items-center gap-2">
-                        <FaMapMarkerAlt />
-                        {selectedBranchInfo.address}, {selectedBranchInfo.city}
-                      </div>
-                    )}
-                  </>
+            {branchesLoading ? (
+              <p className="text-gray-400 text-sm">Loading branches...</p>
+            ) : (
+              <div className="space-y-4">
+                <select
+                  className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-3 transition-all"
+                  value={selectedBranch || ""}
+                  onChange={(e) => setSelectedBranch(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Choose a nearby branch...</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name} - {branch.city}
+                    </option>
+                  ))}
+                </select>
+                {selectedBranchInfo && (
+                  <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 text-blue-800 dark:text-blue-200 rounded-xl text-sm">
+                    <FaMapMarkerAlt className="mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold block mb-0.5">{selectedBranchInfo.name}</span>
+                      <span className="opacity-80">{selectedBranchInfo.address}, {selectedBranchInfo.city}</span>
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Add Items */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-6 text-gray-900 dark:text-gray-100">
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-2 rounded-lg text-purple-600 dark:text-purple-400">
+                <FaTshirt />
+              </div>
+              <h2 className="text-lg font-bold">Add Items</h2>
             </div>
 
-            {/* Item Type Selection */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Item Type</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setClothType("individual")}
-                  className={`flex-1 px-4 py-2 border rounded-lg flex items-center justify-center gap-2 ${clothType === "individual" ? "bg-blue-500 text-white" : "bg-white hover:bg-gray-50"
-                    }`}
+            {/* Type Toggles */}
+            <div className="grid grid-cols-2 gap-3 mb-6 p-1 bg-gray-100 dark:bg-gray-700/50 rounded-xl">
+              <button
+                onClick={() => setClothType("individual")}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${clothType === "individual"
+                  ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                  }`}
+              >
+                <FaTshirt /> Individual
+              </button>
+              <button
+                onClick={() => setClothType("bulk")}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${clothType === "bulk"
+                  ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                  }`}
+              >
+                <FaBox /> Bulk (Kg)
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Item Type</label>
+                <select
+                  className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  value={clothName}
+                  onChange={(e) => setClothName(e.target.value)}
                 >
-                  <FaTshirt /> Individual Items
-                </button>
-                <button
-                  onClick={() => setClothType("bulk")}
-                  className={`flex-1 px-4 py-2 border rounded-lg flex items-center justify-center gap-2 ${clothType === "bulk" ? "bg-blue-500 text-white" : "bg-white hover:bg-gray-50"
-                    }`}
+                  <option value="">Select type...</option>
+                  {clothNames.map((c) => (
+                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Material</label>
+                <select
+                  className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500/20 transition-all disabled:opacity-50"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  disabled={!clothName}
                 >
-                  <FaBox /> Bulk Items
-                </button>
+                  <option value="">Select material...</option>
+                  {clothName &&
+                    clothMaterials(clothName).map((m) => (
+                      <option key={m} value={m}>
+                        {m.charAt(0).toUpperCase() + m.slice(1)} - ₨ {prices[clothName][m]} / {clothType === "individual" ? "pc" : "kg"}
+                      </option>
+                    ))}
+                </select>
               </div>
             </div>
 
-            {/* Item Selection */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Add Items</h2>
-              <div className="border rounded-lg p-4 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Cloth Type</label>
-                    <select
-                      className="w-full border rounded px-3 py-2"
-                      value={clothName}
-                      onChange={(e) => setClothName(e.target.value)}
-                    >
-                      <option value="">Select cloth type</option>
-                      {clothNames.map((c) => (
-                        <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                      ))}
-                    </select>
-                  </div>
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Quantity</label>
+                <div className="flex items-center border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-r border-gray-200 dark:border-gray-600"
+                  >
+                    <FaMinus className="text-gray-500" size={12} />
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    className="w-full bg-transparent text-center outline-none px-2 text-gray-900 dark:text-gray-100 font-semibold"
+                    value={quantity}
+                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                  />
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-l border-gray-200 dark:border-gray-600"
+                  >
+                    <FaPlus className="text-gray-500" size={12} />
+                  </button>
+                </div>
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Material</label>
-                    <select
-                      className="w-full border rounded px-3 py-2"
-                      value={material}
-                      onChange={(e) => setMaterial(e.target.value)}
-                      disabled={!clothName}
-                    >
-                      <option value="">Select material</option>
-                      {clothName &&
-                        clothMaterials(clothName).map((m) => (
-                          <option key={m} value={m}>
-                            {m.charAt(0).toUpperCase() + m.slice(1)} - Rs. {prices[clothName][m]} per {clothType === "individual" ? "piece" : "kg"}
-                          </option>
+              <div className="flex-1 w-full sm:w-auto">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Est. Price</label>
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-xl px-4 py-3 font-mono font-bold text-gray-900 dark:text-gray-100 text-center">
+                  ₨ {getPrice().toLocaleString()}
+                </div>
+              </div>
+
+              <button
+                onClick={addToCart}
+                disabled={!clothName || !material || quantity <= 0}
+                className="w-full sm:w-auto px-6 py-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-nowrap"
+              >
+                Add to Cart
+              </button>
+            </div>
+          </div>
+
+          {/* Service Options */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-6 text-gray-900 dark:text-gray-100">
+              <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg text-green-600 dark:text-green-400">
+                <FaClock />
+              </div>
+              <h2 className="text-lg font-bold">Logistics & Services</h2>
+            </div>
+
+            <div className="space-y-6">
+              {/* Pickup Toggle */}
+              <div className={`border rounded-xl p-5 transition-all ${pickupEnabled ? 'border-green-500 bg-green-50/10' : 'border-gray-200 dark:border-gray-700'}`}>
+                <label className="flex items-center justify-between cursor-pointer w-full">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${pickupEnabled ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
+                      {pickupEnabled && <FaPlus className="text-white rotate-45" size={10} />}
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-900 dark:text-gray-100 block">Pickup Service</span>
+                      <span className="text-sm text-gray-500">We collect your laundry (+₨ 200)</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={pickupEnabled}
+                    onChange={(e) => setPickupEnabled(e.target.checked)}
+                    className="hidden"
+                  />
+                </label>
+
+                {pickupEnabled && (
+                  <div className="mt-6 pl-2 sm:pl-8 space-y-4 animate-fadeIn">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="relative">
+                        <FaCalendar className="absolute left-3 top-3.5 text-gray-400" />
+                        <input
+                          type="date"
+                          value={pickupDate}
+                          onChange={(e) => setPickupDate(e.target.value)}
+                          className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-green-500/20"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                      <div className="relative">
+                        <FaClock className="absolute left-3 top-3.5 text-gray-400" />
+                        <select
+                          value={pickupTime}
+                          onChange={(e) => setPickupTime(e.target.value)}
+                          className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-green-500/20 appearance-none"
+                        >
+                          <option value="">Select Time Slot</option>
+                          {TIME_SLOTS.map(slot => (
+                            <option key={slot.value} value={slot.value}>{slot.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Pickup Address</label>
+                      <select
+                        className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 mb-3 outline-none focus:ring-2 focus:ring-green-500/20"
+                        value={selectedPickupAddressId || "new"}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handlePickupAddressSelection(val === "new" ? null : parseInt(val));
+                        }}
+                        disabled={addressesLoading}
+                      >
+                        {pickupAddresses.map((addr) => (
+                          <option key={addr.id} value={addr.id}>{addr.address}</option>
                         ))}
-                    </select>
-                  </div>
-                </div>
+                        <option value="new">+ Add New Address</option>
+                      </select>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Quantity ({clothType === "individual" ? "pieces" : "kg"})
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      className="w-full border rounded px-3 py-2"
-                      value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Price</label>
-                    <div className="px-3 py-2 bg-gray-100 border rounded font-semibold">
-                      Rs. {getPrice()}
+                      {(pickupAddresses.length === 0 || showNewPickupAddress || selectedPickupAddressId === null) && (
+                        <div className="space-y-3 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl">
+                          <MapAddressSelector
+                            onAddressSelect={handlePickupAddressSelect}
+                            initialAddress={pickupAddress}
+                            initialMapLink={pickupMapLink}
+                            height="250px"
+                          />
+                          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={savePickupAddress}
+                              onChange={(e) => setSavePickupAddress(e.target.checked)}
+                              className="w-4 h-4 rounded text-green-600 focus:ring-green-500"
+                            />
+                            <span>Save for future orders</span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                <button
-                  onClick={addToCart}
-                  disabled={!clothName || !material || quantity <= 0}
-                  className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg font-semibold"
-                >
-                  Add to Cart
-                </button>
+                )}
               </div>
-            </div>
 
-            {/* Service Options */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Service Options</h2>
-              <div className="space-y-4">
-                {/* Pickup Option */}
-                <div className="border rounded-lg p-4">
-                  <label className="flex items-center gap-2 mb-3">
-                    <input
-                      type="checkbox"
-                      checked={pickupEnabled}
-                      onChange={(e) => setPickupEnabled(e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Pickup Service (+Rs. 200)</span>
-                  </label>
-                  {pickupEnabled && (
-                    <div className="ml-6 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Pickup Date</label>
-                          <input
-                            type="date"
-                            value={pickupDate}
-                            onChange={(e) => setPickupDate(e.target.value)}
-                            className="w-full border rounded px-3 py-2"
-                            min={new Date().toISOString().split('T')[0]}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Pickup Time</label>
-                          <input
-                            type="time"
-                            value={pickupTime}
-                            onChange={(e) => setPickupTime(e.target.value)}
-                            className="w-full border rounded px-3 py-2"
-                          />
-                        </div>
+              {/* Delivery Toggle */}
+              <div className={`border rounded-xl p-5 transition-all ${deliveryEnabled ? 'border-blue-500 bg-blue-50/10' : 'border-gray-200 dark:border-gray-700'}`}>
+                <label className="flex items-center justify-between cursor-pointer w-full">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${deliveryEnabled ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                      {deliveryEnabled && <FaPlus className="text-white rotate-45" size={10} />}
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-900 dark:text-gray-100 block">Delivery Service</span>
+                      <span className="text-sm text-gray-500">We return your clean clothes (+₨ 200)</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={deliveryEnabled}
+                    onChange={(e) => setDeliveryEnabled(e.target.checked)}
+                    className="hidden"
+                  />
+                </label>
+
+                {deliveryEnabled && (
+                  <div className="mt-6 pl-2 sm:pl-8 space-y-4 animate-fadeIn">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="relative">
+                        <FaCalendar className="absolute left-3 top-3.5 text-gray-400" />
+                        <input
+                          type="date"
+                          value={deliveryDate}
+                          onChange={(e) => setDeliveryDate(e.target.value)}
+                          className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
                       </div>
-
-                      {/* Saved Pickup Address Selection */}
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Pickup Address</label>
-                        {addressesLoading ? (
-                          <div className="text-blue-600 text-sm">Loading saved addresses...</div>
-                        ) : pickupAddresses.length > 0 ? (
-                          <div className="space-y-2">
-                            <select
-                              className="w-full border rounded px-3 py-2"
-                              value={selectedPickupAddressId || "new"}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                handlePickupAddressSelection(val === "new" ? null : parseInt(val));
-                              }}
-                            >
-                              {pickupAddresses.map((addr) => (
-                                <option key={addr.id} value={addr.id}>
-                                  {addr.address} {addr.is_default ? "(Default)" : ""}
-                                </option>
-                              ))}
-                              <option value="new">+ Add New Address</option>
-                            </select>
-
-                            {selectedPickupAddressId && pickupAddress && (
-                              <div className="p-2 bg-blue-50 rounded text-sm flex items-center gap-2">
-                                <FaMapMarkerAlt className="text-blue-600" />
-                                <span>{pickupAddress}</span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 mb-2">No saved pickup addresses. Add a new one below.</div>
-                        )}
-
-                        {/* New Address Form (shown when no saved addresses or "Add New" selected) */}
-                        {(pickupAddresses.length === 0 || showNewPickupAddress || selectedPickupAddressId === null) && (
-                          <div className="mt-2 space-y-2">
-                            <MapAddressSelector
-                              onAddressSelect={handlePickupAddressSelect}
-                              initialAddress={pickupAddress}
-                              initialMapLink={pickupMapLink}
-                              height="200px"
-                            />
-                            <label className="flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={savePickupAddress}
-                                onChange={(e) => setSavePickupAddress(e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <FaSave className="text-green-600" />
-                              <span>Save this address for future orders</span>
-                            </label>
-                          </div>
-                        )}
+                      <div className="relative">
+                        <FaClock className="absolute left-3 top-3.5 text-gray-400" />
+                        <select
+                          value={deliveryTime}
+                          onChange={(e) => setDeliveryTime(e.target.value)}
+                          className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none"
+                        >
+                          <option value="">Select Time Slot</option>
+                          {TIME_SLOTS.map(slot => (
+                            <option key={slot.value} value={slot.value}>{slot.label}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Delivery Option */}
-                <div className="border rounded-lg p-4">
-                  <label className="flex items-center gap-2 mb-3">
-                    <input
-                      type="checkbox"
-                      checked={deliveryEnabled}
-                      onChange={(e) => setDeliveryEnabled(e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Delivery Service (+Rs. 200)</span>
-                  </label>
-                  {deliveryEnabled && (
-                    <div className="ml-6 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Delivery Date</label>
-                          <input
-                            type="date"
-                            value={deliveryDate}
-                            onChange={(e) => setDeliveryDate(e.target.value)}
-                            className="w-full border rounded px-3 py-2"
-                            min={new Date().toISOString().split('T')[0]}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Delivery Address</label>
+                      <select
+                        className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 mb-3 outline-none focus:ring-2 focus:ring-blue-500/20"
+                        value={selectedDeliveryAddressId || "new"}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleDeliveryAddressSelection(val === "new" ? null : parseInt(val));
+                        }}
+                        disabled={addressesLoading}
+                      >
+                        {deliveryAddresses.map((addr) => (
+                          <option key={addr.id} value={addr.id}>{addr.address}</option>
+                        ))}
+                        <option value="new">+ Add New Address</option>
+                      </select>
+
+                      {(deliveryAddresses.length === 0 || showNewDeliveryAddress || selectedDeliveryAddressId === null) && (
+                        <div className="space-y-3 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl">
+                          <MapAddressSelector
+                            onAddressSelect={handleDeliveryAddressSelect}
+                            initialAddress={deliveryAddress}
+                            initialMapLink={deliveryMapLink}
+                            height="250px"
                           />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Delivery Time</label>
-                          <input
-                            type="time"
-                            value={deliveryTime}
-                            onChange={(e) => setDeliveryTime(e.target.value)}
-                            className="w-full border rounded px-3 py-2"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Saved Delivery Address Selection */}
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Delivery Address</label>
-                        {addressesLoading ? (
-                          <div className="text-blue-600 text-sm">Loading saved addresses...</div>
-                        ) : deliveryAddresses.length > 0 ? (
-                          <div className="space-y-2">
-                            <select
-                              className="w-full border rounded px-3 py-2"
-                              value={selectedDeliveryAddressId || "new"}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                handleDeliveryAddressSelection(val === "new" ? null : parseInt(val));
-                              }}
-                            >
-                              {deliveryAddresses.map((addr) => (
-                                <option key={addr.id} value={addr.id}>
-                                  {addr.address} {addr.is_default ? "(Default)" : ""}
-                                </option>
-                              ))}
-                              <option value="new">+ Add New Address</option>
-                            </select>
-
-                            {selectedDeliveryAddressId && deliveryAddress && (
-                              <div className="p-2 bg-green-50 rounded text-sm flex items-center gap-2">
-                                <FaMapMarkerAlt className="text-green-600" />
-                                <span>{deliveryAddress}</span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 mb-2">No saved delivery addresses. Add a new one below.</div>
-                        )}
-
-                        {/* New Address Form (shown when no saved addresses or "Add New" selected) */}
-                        {(deliveryAddresses.length === 0 || showNewDeliveryAddress || selectedDeliveryAddressId === null) && (
-                          <div className="mt-2 space-y-2">
-                            <MapAddressSelector
-                              onAddressSelect={handleDeliveryAddressSelect}
-                              initialAddress={deliveryAddress}
-                              initialMapLink={deliveryMapLink}
-                              height="200px"
+                          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={saveDeliveryAddress}
+                              onChange={(e) => setSaveDeliveryAddress(e.target.checked)}
+                              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                             />
-                            <label className="flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={saveDeliveryAddress}
-                                onChange={(e) => setSaveDeliveryAddress(e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <FaSave className="text-green-600" />
-                              <span>Save this address for future orders</span>
-                            </label>
-                          </div>
-                        )}
-                      </div>
+                            <span>Save for future orders</span>
+                          </label>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
 
-                {/* Urgent Option */}
-                <div className="border rounded-lg p-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isUrgent}
-                      onChange={(e) => setIsUrgent(e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Urgent Service (+Rs. 500)</span>
-                    <span className="text-sm text-gray-600">- Delivered within 24 hours</span>
-                  </label>
-                </div>
+              {/* Urgent Toggle */}
+              <div className={`border rounded-xl p-5 transition-all ${isUrgent ? 'border-red-500 bg-red-50/10' : 'border-gray-200 dark:border-gray-700'}`}>
+                <label className="flex items-center justify-between cursor-pointer w-full">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isUrgent ? 'bg-red-500 border-red-500' : 'border-gray-300'}`}>
+                      {isUrgent && <FaPlus className="text-white rotate-45" size={10} />}
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-900 dark:text-gray-100 block">Urgent Service</span>
+                      <span className="text-sm text-gray-500">Delivery within 24 hours (+₨ 500)</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isUrgent}
+                    onChange={(e) => setIsUrgent(e.target.checked)}
+                    className="hidden"
+                  />
+                </label>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Cart Summary */}
-        <div className="lg:col-span-1">
-          <div className="bg-white shadow rounded p-6 sticky top-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <FaShoppingCart />
-              Your Cart ({cart.length} items)
+        {/* Cart Summary (Right Column) */}
+        <div className="col-span-1">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 sticky top-6">
+            <h2 className="text-xl font-bold flex items-center gap-2 mb-6 text-gray-900 dark:text-gray-100">
+              <FaShoppingCart className="text-blue-600" />
+              Your Cart
             </h2>
 
             {cart.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <FaShoppingCart className="mx-auto text-4xl mb-2 opacity-50" />
-                <p>Your cart is empty</p>
-                <p className="text-sm">Add items to get started</p>
+              <div className="text-center py-10 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-xl">
+                <FaShoppingCart className="mx-auto text-3xl text-gray-300 mb-2" />
+                <p className="text-gray-400 font-medium">Cart is empty</p>
               </div>
             ) : (
-              <>
-                <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+              <div className="space-y-4">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
                   {cart.map((item) => (
-                    <div key={item.id} className="border rounded p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{item.clothName}</h4>
-                          <p className="text-sm text-gray-600">{item.material}</p>
-                          <p className="text-sm text-gray-600">
-                            Rs. {item.unitPrice} per {item.clothType === "individual" ? "piece" : "kg"}
-                          </p>
+                    <div key={item.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl flex justify-between items-start group">
+                      <div>
+                        <h4 className="font-bold text-gray-900 dark:text-gray-100">{item.clothName}</h4>
+                        <p className="text-xs text-gray-500 capitalize">{item.material} • {item.clothType}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-600 shadow-sm">
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              className="w-5 h-5 flex items-center justify-center hover:text-red-500"
+                            >
+                              -
+                            </button>
+                            <span className="w-8 text-center text-xs font-bold">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="w-5 h-5 flex items-center justify-center hover:text-green-500"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-900 dark:text-gray-100">₨ {item.price}</p>
                         <button
                           onClick={() => removeFromCart(item.id)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-gray-400 hover:text-red-500 transition-colors mt-2 p-1"
                         >
-                          <FaTrash />
+                          <FaTrash size={12} />
                         </button>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100"
-                          >
-                            -
-                          </button>
-                          <span className="w-8 text-center">{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <div className="font-semibold">Rs. {item.price}</div>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="border-t pt-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>Rs. {subtotal}</span>
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Subtotal</span>
+                    <span>₨ {subtotal.toLocaleString()}</span>
                   </div>
                   {pickupEnabled && (
-                    <div className="flex justify-between text-sm">
-                      <span>Pickup Service:</span>
-                      <span>Rs. {pickupCost}</span>
+                    <div className="flex justify-between text-green-600">
+                      <span>Pickup fee</span>
+                      <span>+ ₨ {pickupCost}</span>
                     </div>
                   )}
                   {deliveryEnabled && (
-                    <div className="flex justify-between text-sm">
-                      <span>Delivery Service:</span>
-                      <span>Rs. {deliveryCost}</span>
+                    <div className="flex justify-between text-blue-600">
+                      <span>Delivery fee</span>
+                      <span>+ ₨ {deliveryCost}</span>
                     </div>
                   )}
                   {isUrgent && (
-                    <div className="flex justify-between text-sm">
-                      <span>Urgent Service:</span>
-                      <span>Rs. {urgentCost}</span>
+                    <div className="flex justify-between text-red-600">
+                      <span>Urgent fee</span>
+                      <span>+ ₨ {urgentCost}</span>
                     </div>
                   )}
-                  <div className="border-t pt-2 flex justify-between font-bold text-lg">
-                    <span>Total:</span>
-                    <span>Rs. {total}</span>
+                  <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-gray-100 pt-3 border-t border-gray-100 dark:border-gray-700 mt-2">
+                    <span>Total</span>
+                    <span>₨ {total.toLocaleString()}</span>
                   </div>
                 </div>
 
                 <button
                   onClick={proceedToCheckout}
-                  disabled={cart.length === 0 || !selectedBranch || isLoading}
-                  className="w-full mt-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white px-4 py-3 rounded-lg font-semibold text-lg"
+                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all active:scale-95"
                 >
-                  {isLoading ? "Processing..." : "Proceed to Checkout"}
+                  Proceed to Checkout
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>

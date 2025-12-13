@@ -210,3 +210,11 @@ class UpdateProfileSerializer(serializers.ModelSerializer):
         if user and User.objects.filter(email=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return value
+
+class UserListSerializer(serializers.ModelSerializer):
+    """Serializer for listing users (e.g., riders)."""
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'full_name', 'phone', 'role', 'is_active']

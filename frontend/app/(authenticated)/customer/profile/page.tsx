@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from "react";
 
 import { useAuth } from "../../../contexts/AuthContext";
-import { useUpdateProfile } from "../../../queries/authQueries";
+import { useUpdateProfile, useChangePassword } from "../../../queries/authQueries";
 import { useTranslation } from "react-i18next";
 import "../../../types/i18n";
 
-import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Added import
+import { FaEye, FaEyeSlash, FaCamera, FaUser, FaEnvelope, FaPhone, FaLock, FaPen } from 'react-icons/fa';
 
 export default function CustomerProfilePage() {
   const { user } = useAuth();
@@ -47,8 +47,11 @@ export default function CustomerProfilePage() {
 
   if (!user) {
     return (
-      <div className="max-w-lg mx-auto bg-white dark:bg-gray-800 rounded-lg shadow p-8 mt-8 text-center text-gray-500">
-        {t('customer.profile.loading')}
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-24 w-24 bg-gray-200 dark:bg-gray-700 rounded-full mb-4"></div>
+          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+        </div>
       </div>
     );
   }
@@ -79,237 +82,360 @@ export default function CustomerProfilePage() {
     });
   };
 
+  const { mutate: changePassword, isPending: isChangingPassword } = useChangePassword();
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPasswords({ ...passwords, [e.target.name]: e.target.value });
+    // Clear errors when user types
+    if (passwordError) setPasswordError(null);
   };
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Call API to change password
-    setShowPasswordModal(false);
-    setPasswords({ current: "", new: "", confirm: "" });
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (passwords.new !== passwords.confirm) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+
+    if (passwords.new.length < 8) {
+      setPasswordError("Password must be at least 8 characters");
+      return;
+    }
+
+    changePassword({
+      old_password: passwords.current,
+      new_password: passwords.new,
+      confirm_password: passwords.confirm
+    }, {
+      onSuccess: (data) => {
+        setPasswordSuccess(data.message || "Password changed successfully");
+        setPasswords({ current: "", new: "", confirm: "" });
+        // Optional: Close modal after delay or keep it open with success message
+        setTimeout(() => {
+          setShowPasswordModal(false);
+          setPasswordSuccess(null);
+        }, 2000);
+      },
+      onError: (error) => {
+        setPasswordError(error.message || error.error || "Failed to change password");
+      }
+    });
+  };
+
+  // Helper to get initials
+  const getInitials = () => {
+    return `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase();
   };
 
   return (
-    <div className="max-w-lg mx-auto bg-white dark:bg-gray-800 rounded-lg shadow p-8 mt-8">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">{t('customer.profile.title')}</h1>
+    <div className="max-w-4xl mx-auto py-8 animate-fadeIn">
+      {/* Header Section with Avatar */}
+      <div className="flex flex-col items-center mb-12">
+        <div className="relative group">
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg mb-4">
+            {getInitials()}
+          </div>
+          {/* Optional: Camera icon overlay for future avatar upload feature */}
+          <div className="absolute bottom-4 right-0 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md text-gray-500 hover:text-blue-600 cursor-pointer transition-colors opacity-0 group-hover:opacity-100">
+            <FaCamera size={14} />
+          </div>
+        </div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          {user.first_name} {user.last_name}
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">{user.role || 'Customer'}</p>
+      </div>
 
       {updateError && (
-        <div className="mb-4 p-3 rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+        <div className="mb-8 p-4 rounded-xl bg-red-50 text-red-600 border border-red-100 text-center max-w-lg mx-auto">
           {updateError.message || updateError.error || t('customer.profile.updateFailed')}
         </div>
       )}
 
-      <form className="space-y-4" onSubmit={handleSave}>
-        <div>
-          <span className="block text-gray-500 dark:text-gray-400 text-sm">{t('customer.profile.fullName')}</span>
-          {editMode ? (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                name="first_name"
-                value={form.first_name}
-                onChange={handleChange}
-                className="border rounded px-2 py-1 w-1/2"
-                placeholder={t('customer.profile.firstName')}
-                required
-              />
-              <input
-                type="text"
-                name="last_name"
-                value={form.last_name}
-                onChange={handleChange}
-                className="border rounded px-2 py-1 w-1/2"
-                placeholder={t('customer.profile.lastName')}
-                required
-              />
-            </div>
-          ) : (
-            <span className="block text-lg font-medium text-gray-900 dark:text-gray-100">
-              {user.first_name} {user.last_name}
-            </span>
-          )}
-        </div>
-        <div>
-          <span className="block text-gray-500 dark:text-gray-400 text-sm">{t('customer.profile.email')}</span>
-          {editMode ? (
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              className="border rounded px-2 py-1 w-full"
-              placeholder={t('customer.profile.email')}
-              required
-            />
-          ) : (
-            <span className="block text-lg font-medium text-gray-900 dark:text-gray-100">
-              {user.email}
-            </span>
-          )}
-        </div>
-        <div>
-          <span className="block text-gray-500 dark:text-gray-400 text-sm">{t('customer.profile.phone')}</span>
-          {editMode ? (
-            <input
-              type="tel"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              className="border rounded px-2 py-1 w-full"
-              placeholder={t('customer.profile.phoneNumber')}
-              required
-            />
-          ) : (
-            <span className="block text-lg font-medium text-gray-900 dark:text-gray-100">
-              {user.phone || "-"}
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2 mt-6">
-          {editMode ? (
-            <>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-4xl mx-auto px-4">
+
+        {/* Left Column: Personal Information */}
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <FaUser className="text-blue-500" size={18} />
+              Personal Information
+            </h2>
+            {!editMode && (
               <button
-                type="submit"
-                disabled={isUpdating}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg"
-              >
-                {isUpdating ? t('customer.profile.saving') : t('customer.profile.save')}
-              </button>
-              <button
-                type="button"
-                disabled={isUpdating}
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 disabled:opacity-50 text-gray-800 rounded-lg"
-                onClick={handleCancel}
-              >
-                {t('customer.profile.cancel')}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                 onClick={handleEdit}
+                className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1"
               >
-                {t('customer.profile.editProfile')}
+                <FaPen size={12} /> Edit
               </button>
-              <button
-                type="button"
-                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg"
-                onClick={() => setShowPasswordModal(true)}
-              >
-                {t('customer.profile.changePassword')}
-              </button>
-            </>
-          )}
-        </div>
-      </form>
+            )}
+          </div>
 
-      {/* Password Change Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-md relative border border-gray-200 dark:border-gray-700 animate-fadeIn">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl font-bold transition-colors duration-200"
-              onClick={() => setShowPasswordModal(false)}
-              aria-label="Close"
-            >
-              <span aria-hidden="true">×</span>
-            </button>
-            <div className="flex flex-col items-center mb-4">
-              <span className="inline-block bg-blue-100 text-blue-600 rounded-full p-3 mb-2 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75A4.5 4.5 0 008 6.75v3.75m8.25 0a2.25 2.25 0 012.25 2.25v4.5A2.25 2.25 0 0116.25 21H7.75A2.25 2.25 0 015.5 17.25v-4.5a2.25 2.25 0 012.25-2.25m8.25 0H7.75" />
-                </svg>
-              </span>
-              <h2 className="text-2xl font-extrabold mb-1 text-gray-900 dark:text-gray-100">{t('customer.profile.passwordModal.title')}</h2>
-              <p className="text-gray-500 dark:text-gray-300 text-sm">{t('customer.profile.passwordModal.subtitle')}</p>
+          <form onSubmit={handleSave} className="space-y-6">
+            {/* Name Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-1">First Name</label>
+                {editMode ? (
+                  <input
+                    type="text"
+                    name="first_name"
+                    value={form.first_name}
+                    onChange={handleChange}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border-b-2 border-gray-200 dark:border-gray-700 focus:border-blue-500 px-3 py-2 outline-none transition-colors rounded-t-lg"
+                    placeholder="First Name"
+                    required
+                  />
+                ) : (
+                  <div className="text-lg text-gray-900 dark:text-gray-100 px-3 py-2 bg-transparent border-b border-transparent">
+                    {user.first_name}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-1">Last Name</label>
+                {editMode ? (
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={form.last_name}
+                    onChange={handleChange}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border-b-2 border-gray-200 dark:border-gray-700 focus:border-blue-500 px-3 py-2 outline-none transition-colors rounded-t-lg"
+                    placeholder="Last Name"
+                    required
+                  />
+                ) : (
+                  <div className="text-lg text-gray-900 dark:text-gray-100 px-3 py-2 bg-transparent border-b border-transparent">
+                    {user.last_name}
+                  </div>
+                )}
+              </div>
             </div>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              import {FaEye, FaEyeSlash} from 'react-icons/fa';
 
-              // ... (in component body)
-              const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-              const [showNewPassword, setShowNewPassword] = useState(false);
-              const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+            {/* Email Field - Read Only usually but editable if needed */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-1 flex items-center gap-2">
+                <FaEnvelope size={10} /> Email Address
+              </label>
+              <div className="text-lg text-gray-900 dark:text-gray-100 px-3 py-2 bg-transparent opacity-75">
+                {user.email}
+              </div>
+            </div>
 
-              // ... (inside form render)
-              <div>
-                <label className="block text-gray-700 dark:text-gray-200 text-sm mb-1 font-semibold">{t('customer.profile.passwordModal.currentPassword')}</label>
-                <div className="relative">
-                  <input
-                    type={showCurrentPassword ? "text" : "password"}
-                    name="current"
-                    value={passwords.current}
-                    onChange={handlePasswordChange}
-                    className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  >
-                    {showCurrentPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
-                  </button>
+            {/* Phone Field */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider pl-1 flex items-center gap-2">
+                <FaPhone size={10} /> Phone Number
+              </label>
+              {editMode ? (
+                <input
+                  type="tel"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-b-2 border-gray-200 dark:border-gray-700 focus:border-blue-500 px-3 py-2 outline-none transition-colors rounded-t-lg"
+                  placeholder="Phone Number"
+                  required
+                />
+              ) : (
+                <div className="text-lg text-gray-900 dark:text-gray-100 px-3 py-2 bg-transparent border-b border-transparent">
+                  {user.phone || <span className="text-gray-400 italic">No phone number added</span>}
                 </div>
-              </div>
-              <div>
-                <label className="block text-gray-700 dark:text-gray-200 text-sm mb-1 font-semibold">{t('customer.profile.passwordModal.newPassword')}</label>
-                <div className="relative">
-                  <input
-                    type={showNewPassword ? "text" : "password"}
-                    name="new"
-                    value={passwords.new}
-                    onChange={handlePasswordChange}
-                    className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                  >
-                    {showNewPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-gray-700 dark:text-gray-200 text-sm mb-1 font-semibold">{t('customer.profile.passwordModal.confirmPassword')}</label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    name="confirm"
-                    value={passwords.confirm}
-                    onChange={handlePasswordChange}
-                    className="border border-gray-300 dark:border-gray-700 focus:border-blue-400 dark:focus:border-blue-500 rounded-lg px-3 py-2 w-full outline-none transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4 justify-center">
+              )}
+            </div>
+
+            {editMode && (
+              <div className="flex gap-3 pt-4 animate-fadeIn">
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition-colors duration-200"
+                  disabled={isUpdating}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium shadow-md shadow-blue-200 dark:shadow-none transition-all disabled:opacity-50"
                 >
-                  {t('customer.profile.passwordModal.changeButton')}
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   type="button"
-                  className="px-5 py-2 bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold rounded-lg shadow transition-colors duration-200"
-                  onClick={() => setShowPasswordModal(false)}
+                  onClick={handleCancel}
+                  disabled={isUpdating}
+                  className="px-6 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full font-medium border border-gray-200 dark:border-gray-700 transition-all disabled:opacity-50"
                 >
-                  {t('customer.profile.passwordModal.cancelButton')}
+                  Cancel
                 </button>
               </div>
-            </form>
+            )}
+          </form>
+        </section>
+
+        {/* Right Column: Security & Settings */}
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <FaLock className="text-purple-500" size={16} />
+              Security
+            </h2>
+          </div>
+
+          <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 p-6 border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">Password</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Changed 3 months ago</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(true)}
+                className="px-4 py-2 text-sm bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-200 dark:border-gray-600 transition-colors shadow-sm"
+              >
+                Update Password
+              </button>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+              <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Account Status</h3>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">Active</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Settings Placeholder - e.g. Notifications */}
+          <div className="mt-8 opacity-50 cursor-not-allowed">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Notifications</h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Order Updates</span>
+                <div className="w-10 h-6 bg-blue-100 rounded-full flex items-center p-1"><div className="w-4 h-4 bg-blue-500 rounded-full"></div></div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Promotions</span>
+                <div className="w-10 h-6 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center p-1"><div className="w-4 h-4 bg-white rounded-full shadow-sm"></div></div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+      </div>
+
+      {/* Modern Glassmorphism Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowPasswordModal(false)}></div>
+
+          <div className="relative bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slideUp">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">Change Password</h3>
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6">
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                {passwordError && (
+                  <div className="p-3 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm text-center">
+                    {passwordError}
+                  </div>
+                )}
+                {passwordSuccess && (
+                  <div className="p-3 bg-green-50 text-green-600 border border-green-100 rounded-lg text-sm text-center">
+                    {passwordSuccess}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Current Password</label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      name="current"
+                      value={passwords.current}
+                      onChange={handlePasswordChange}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 outline-none transition-all"
+                      placeholder="Enter current password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    >
+                      {showCurrentPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      name="new"
+                      value={passwords.new}
+                      onChange={handlePasswordChange}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 outline-none transition-all"
+                      placeholder="Enter new password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                    >
+                      {showNewPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Confirm New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirm"
+                      value={passwords.confirm}
+                      onChange={handlePasswordChange}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 outline-none transition-all"
+                      placeholder="Confirm new password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg shadow-blue-200 dark:shadow-none transition-all disabled:opacity-50 flex justify-center items-center"
+                  >
+                    {isChangingPassword ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : 'Change Password'}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl font-semibold transition-all"
+                    onClick={() => setShowPasswordModal(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

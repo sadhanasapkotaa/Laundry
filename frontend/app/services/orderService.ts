@@ -34,7 +34,7 @@ export interface Order {
   total_amount: number;
   payment_method: 'cash' | 'bank' | 'esewa';
   payment_status: 'pending' | 'partially_paid' | 'paid' | 'failed';
-  status: 'pending pickup' | 'pending' | 'in progress' | 'to be delivered' | 'completed' | 'cancelled';
+  status: 'dropped by user' | 'pending pickup' | 'picked up' | 'sent to wash' | 'in wash' | 'washed' | 'picked by client' | 'pending delivery' | 'delivered' | 'cancelled' | 'refunded';
   created: string;
   order_date?: string;
   description?: string;
@@ -65,7 +65,7 @@ export interface CreateOrderRequest {
 
 export interface UpdateOrderRequest {
   payment_status?: 'pending' | 'partially_paid' | 'paid' | 'failed';
-  status?: 'pending pickup' | 'pending' | 'in progress' | 'to be delivered' | 'completed' | 'cancelled';
+  status?: 'dropped by user' | 'pending pickup' | 'picked up' | 'sent to wash' | 'in wash' | 'washed' | 'picked by client' | 'pending delivery' | 'delivered' | 'cancelled' | 'refunded';
   esewa_reference?: string;
   delivery_contact?: string;
 }

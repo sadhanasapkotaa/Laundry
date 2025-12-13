@@ -16,25 +16,25 @@ export const PERMISSIONS: Permission[] = [
   // User Management
   { id: 'user_management_full', name: 'Full User Management', description: 'Create, edit, delete all users', category: 'User Management' },
   { id: 'user_management_profile', name: 'Profile Management', description: 'Edit own profile only', category: 'User Management' },
-  
+
   // Service Management
   { id: 'service_management_full', name: 'Full Service Management', description: 'Manage all services and pricing', category: 'Service Management' },
   { id: 'service_management_read', name: 'Read Service Information', description: 'View service details only', category: 'Service Management' },
-  
+
   // Order Management
   { id: 'order_management_full', name: 'Full Order Management', description: 'Manage all orders across branches', category: 'Order Management' },
   { id: 'order_management_branch', name: 'Branch Order Management', description: 'Manage orders for own branch', category: 'Order Management' },
   { id: 'order_management_delivery', name: 'Delivery Order Management', description: 'Manage delivery orders only', category: 'Order Management' },
   { id: 'order_management_own', name: 'Own Orders', description: 'View and manage own orders only', category: 'Order Management' },
-  
+
   // Branch Management
   { id: 'branch_management_full', name: 'Full Branch Management', description: 'Manage all branches', category: 'Branch Management' },
   { id: 'branch_management_own', name: 'Own Branch Management', description: 'Manage own branch only', category: 'Branch Management' },
-  
+
   // Payments
   { id: 'payments_full', name: 'Full Payment Management', description: 'Manage all payments and transactions', category: 'Payments' },
   { id: 'payments_own', name: 'Own Payments', description: 'View own payment history only', category: 'Payments' },
-  
+
   // Accounting
   { id: 'accounting_full', name: 'Full Accounting Access', description: 'Access all financial data', category: 'Accounting' },
   { id: 'accounting_branch', name: 'Branch Accounting', description: 'Access financial data for own branch', category: 'Accounting' },
@@ -112,19 +112,19 @@ export const canAccess = {
   branchManagement: (userRole: UserRole) => hasAnyPermission(userRole, ['branch_management_full', 'branch_management_own']),
   payments: (userRole: UserRole) => hasAnyPermission(userRole, ['payments_full', 'payments_own']),
   accounting: (userRole: UserRole) => hasAnyPermission(userRole, ['accounting_full', 'accounting_branch']),
-  
+
   // Feature-specific access levels
   createOrders: (userRole: UserRole) => hasAnyPermission(userRole, ['order_management_full', 'order_management_branch']),
   editAllOrders: (userRole: UserRole) => hasPermission(userRole, 'order_management_full'),
   viewAllOrders: (userRole: UserRole) => hasAnyPermission(userRole, ['order_management_full', 'order_management_branch']),
   manageDeliveries: (userRole: UserRole) => hasAnyPermission(userRole, ['order_management_full', 'order_management_delivery']),
-  
+
   createBranches: (userRole: UserRole) => hasPermission(userRole, 'branch_management_full'),
   editOwnBranch: (userRole: UserRole) => hasAnyPermission(userRole, ['branch_management_full', 'branch_management_own']),
-  
+
   viewAllPayments: (userRole: UserRole) => hasPermission(userRole, 'payments_full'),
   viewOwnPayments: (userRole: UserRole) => hasAnyPermission(userRole, ['payments_full', 'payments_own']),
-  
+
   viewFinancialReports: (userRole: UserRole) => hasAnyPermission(userRole, ['accounting_full', 'accounting_branch']),
   exportFinancialData: (userRole: UserRole) => hasPermission(userRole, 'accounting_full'),
 };
@@ -165,7 +165,7 @@ export const PAGE_PERMISSIONS = {
   '/branches': ['branch_management_full'],
   '/branches/add': ['branch_management_full'],
   '/clients': ['user_management_full', 'order_management_branch'],
-  '/orders': ['order_management_full', 'order_management_branch', 'order_management_delivery'],
+  '/orders': ['order_management_full', 'order_management_branch'],
   '/place-orders': ['order_management_full', 'order_management_branch'],
   '/payments': ['payments_full', 'payments_own'],
   '/expenses': ['accounting_full', 'accounting_branch'],
@@ -182,19 +182,19 @@ export const PAGE_PERMISSIONS = {
 export const getPagePermissions = (path: string): string[] => {
   // Remove query parameters and trailing slashes
   const cleanPath = path.split('?')[0].replace(/\/$/, '');
-  
+
   // Check for exact match first
   if (PAGE_PERMISSIONS[cleanPath as keyof typeof PAGE_PERMISSIONS]) {
     return [...PAGE_PERMISSIONS[cleanPath as keyof typeof PAGE_PERMISSIONS]];
   }
-  
+
   // Check for partial matches (e.g., /branches/123 should match /branches)
   for (const [route, permissions] of Object.entries(PAGE_PERMISSIONS)) {
     if (cleanPath.startsWith(route)) {
       return [...permissions];
     }
   }
-  
+
   return ['user_management_profile']; // Default permission that all users have
 };
 

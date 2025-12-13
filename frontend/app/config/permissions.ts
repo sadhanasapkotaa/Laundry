@@ -9,7 +9,7 @@ export const PAGE_PERMISSIONS: PagePermissions = {
   // Admin has access to everything
   '/dashboard': ['admin', 'branch_manager', 'accountant'],
   '/branch': ['admin', 'branch_manager'],
-  '/orders': ['admin', 'branch_manager', 'rider'],
+  '/orders': ['admin', 'branch_manager'],
   '/place-orders': ['admin', 'branch_manager'], // Staff can place orders for customers
   '/income': ['admin', 'accountant'],
   '/expenses': ['admin', 'accountant'],

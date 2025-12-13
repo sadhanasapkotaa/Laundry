@@ -13,15 +13,34 @@ class Order(models.Model):
     order_date = models.DateTimeField(auto_now_add=True)
     pickup_enabled = models.BooleanField(default=False)
     delivery_enabled = models.BooleanField(default=False)
+    pickup_date = models.DateTimeField(blank=True, null=True)
+    pickup_time = models.CharField(max_length=20, choices=[
+        ('early_morning', 'Early Morning (6am - 9am)'),
+        ('late_morning', 'Late Morning (9am - 12pm)'),
+        ('early_afternoon', 'Early Afternoon (12pm - 3pm)'),
+        ('late_afternoon', 'Late Afternoon (3pm - 6pm)'),
+    ], blank=True, null=True)
+    
     delivery_date = models.DateTimeField(blank=True, null=True)
+    delivery_time = models.CharField(max_length=20, choices=[
+        ('early_morning', 'Early Morning (6am - 9am)'),
+        ('late_morning', 'Late Morning (9am - 12pm)'),
+        ('early_afternoon', 'Early Afternoon (12pm - 3pm)'),
+        ('late_afternoon', 'Late Afternoon (3pm - 6pm)'),
+    ], blank=True, null=True)
     status = models.CharField(max_length=20, choices=[
+        ('dropped by user', 'Dropped by User'),
         ('pending pickup', 'Pending Pickup'),
-        ('pending', 'Pending'),
-        ('in progress', 'In Progress'),
-        ('to be delivered', 'To Be Delivered'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled')
-    ], default='pending')
+        ('picked up', 'Picked Up'),
+        ('sent to wash', 'Sent to Wash'),
+        ('in wash', 'In Wash'),
+        ('washed', 'Washed'),
+        ('picked by client', 'Picked by Client'),
+        ('pending delivery', 'Pending Delivery'),
+        ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled'),
+        ('refunded', 'Refunded')
+    ], default='dropped by user')
     description = models.TextField(blank=True, null=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     is_urgent = models.BooleanField(default=False)
@@ -62,6 +81,7 @@ class Delivery(models.Model):
     """Model representing a delivery associated with an order."""
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='deliveries')
     delivery_address = models.CharField(max_length=255)
+    map_link = models.URLField(blank=True, null=True)
     delivery_contact = models.CharField(max_length=15,
                                         default=models.ForeignKey('users.User',
                                                                   on_delete=models.CASCADE))
@@ -80,11 +100,14 @@ class Delivery(models.Model):
     ], default='pending')
     delivery_start_time = models.DateTimeField(blank=True, null=True)
     delivery_end_time = models.DateTimeField(blank=True, null=True)
-    delivery_time = models.CharField(max_length=20, choices=[
-        ('morning', 'Morning'),
-        ('afternoon', 'Afternoon'),
-        ('evening', 'Evening'),
-    ], default='evening')
+    TIME_SLOTS = [
+        ('early_morning', 'Early Morning (6am - 9am)'),
+        ('late_morning', 'Late Morning (9am - 12pm)'),
+        ('early_afternoon', 'Early Afternoon (12pm - 3pm)'),
+        ('late_afternoon', 'Late Afternoon (3pm - 6pm)'),
+    ]
+
+    delivery_time = models.CharField(max_length=20, choices=TIME_SLOTS, default='late_afternoon')
 
     def __str__(self):
         return f"({self.delivery_type} - Status: {self.status})"
