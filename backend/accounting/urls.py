@@ -9,6 +9,7 @@ from .views import (
     TimePeriodReportView,
     BranchInsightsView,
     FullAccountingView,
+    BranchFinancialSummaryView,
 )
 
 APP_NAME = 'accounting'
@@ -24,6 +25,7 @@ urlpatterns = [
         {'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
         name='income-detail'),
     path('income/by-time/', IncomeViewSet.as_view({'get': 'by_time'}), name='income-by-time'),
+    path('income/statistics/', IncomeViewSet.as_view({'get': 'statistics'}), name='income-statistics'),
     
     # Expense URLs
     path('expenses/', ExpenseViewSet.as_view({'get': 'list', 'post': 'create'}),
@@ -51,4 +53,5 @@ urlpatterns = [
     path('reports/time-period/', TimePeriodReportView.as_view(), name='time-period-report'),
     path('reports/branch-insights/', BranchInsightsView.as_view(), name='branch-insights'),
     path('reports/full-accounting/', FullAccountingView.as_view(), name='full-accounting-report'),
+    path('reports/branch-summary/', BranchFinancialSummaryView.as_view(), name='branch-financial-summary'),
 ]

@@ -25,11 +25,23 @@ class IncomeSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     branch_id_display = serializers.CharField(source='branch.branch_id', read_only=True)
+    payment_reference = serializers.SerializerMethodField()
     
     class Meta:
         """Meta class for Income serializer."""
         model = Income
         fields = '__all__'
+    
+    def get_payment_reference(self, obj):
+        """Get payment reference if this income is from a payment."""
+        if hasattr(obj, 'payment') and obj.payment:
+            return {
+                'transaction_uuid': obj.payment.transaction_uuid,
+                'amount': str(obj.payment.total_amount),
+                'payment_type': obj.payment.payment_type,
+                'status': obj.payment.status,
+            }
+        return None
 
 
 class ExpenseSerializer(serializers.ModelSerializer):

@@ -44,6 +44,8 @@ export const API_CONFIG = {
         DETAIL: (id: string | number) => `/account/income/${id}/`,
         UPDATE: (id: string | number) => `/account/income/${id}/update/`,
         DELETE: (id: string | number) => `/account/income/${id}/delete/`,
+        BY_TIME: '/account/income/by-time/',
+        STATISTICS: '/account/income/statistics/',
       },
       EXPENSE: {
         LIST: '/account/expense/',
@@ -51,6 +53,12 @@ export const API_CONFIG = {
         DETAIL: (id: string | number) => `/account/expense/${id}/`,
         UPDATE: (id: string | number) => `/account/expense/${id}/update/`,
         DELETE: (id: string | number) => `/account/expense/${id}/delete/`,
+        BY_TIME: '/account/expenses/by-time/',
+      },
+      REPORTS: {
+        TIME_PERIOD: '/account/reports/time-period/',
+        BRANCH_INSIGHTS: '/account/reports/branch-insights/',
+        BRANCH_SUMMARY: '/account/reports/branch-summary/',
       },
     },
     // Payments

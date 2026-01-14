@@ -47,6 +47,7 @@ interface OrderData {
     pickupCost: number;
     deliveryCost: number;
     urgentCost: number;
+    discount?: number; // Added discount
     total: number;
   };
   user: number;
@@ -470,6 +471,12 @@ Order ID: ${order.id}`);
                     <span>Rs. {orderData.pricing.urgentCost}</span>
                   </div>
                 )}
+                {orderData.pricing.discount && orderData.pricing.discount > 0 ? (
+                  <div className="flex justify-between text-sm text-green-600 font-medium">
+                    <span>Discount:</span>
+                    <span>- Rs. {orderData.pricing.discount}</span>
+                  </div>
+                ) : null}
                 <div className="border-t pt-2 flex justify-between font-bold text-lg">
                   <span>Total:</span>
                   <span>Rs. {orderData.pricing.total}</span>

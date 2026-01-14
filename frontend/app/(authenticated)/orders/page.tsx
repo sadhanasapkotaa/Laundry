@@ -15,6 +15,12 @@ import {
   FaCheckCircle,
   FaSpinner,
   FaExclamationTriangle,
+  FaClipboard,
+  FaWater,
+  FaUserCheck,
+  FaCheck,
+  FaTimes,
+  FaUndo,
 } from "react-icons/fa";
 import {
   ResponsiveContainer,
@@ -33,7 +39,18 @@ import PaymentService from "../../services/paymentService";
 import { orderAPI, Order as BackendOrder, OrderItem as OrderItemType } from "../../services/orderService";
 import { useAuth } from "../../contexts/AuthContext";
 
-type OrderStatus = "pending pickup" | "pending" | "in progress" | "to be delivered" | "completed" | "cancelled";
+type OrderStatus =
+  | "dropped by user"
+  | "pending pickup"
+  | "picked up"
+  | "sent to wash"
+  | "in wash"
+  | "washed"
+  | "picked by client"
+  | "pending delivery"
+  | "delivered"
+  | "cancelled"
+  | "refunded";
 
 // Frontend display interface (mapped from backend)
 interface DisplayOrder {
@@ -57,22 +74,27 @@ const STATUS_META: Record<
   OrderStatus,
   { color: string; labelKey: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
 > = {
-  'pending pickup': { color: "bg-purple-100 text-purple-800", labelKey: "orders.status.pendingPickup", Icon: FaTruck },
-  pending: { color: "bg-blue-100 text-blue-800", labelKey: "orders.status.pending", Icon: FaBoxOpen },
-  'in progress': { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.status.processing", Icon: FaClock },
-  'to be delivered': { color: "bg-gray-100 text-gray-800", labelKey: "orders.status.outForDelivery", Icon: FaTruck },
-  completed: { color: "bg-green-100 text-green-800", labelKey: "orders.status.completed", Icon: FaCheckCircle },
-  cancelled: { color: "bg-red-100 text-red-800", labelKey: "orders.status.cancelled", Icon: FaExclamationTriangle },
+  'dropped by user': { color: "bg-gray-100 text-gray-800", labelKey: "Dropped by User", Icon: FaClipboard },
+  'pending pickup': { color: "bg-purple-100 text-purple-800", labelKey: "Pending Pickup", Icon: FaTruck },
+  'picked up': { color: "bg-blue-100 text-blue-800", labelKey: "Picked Up", Icon: FaBoxOpen },
+  'sent to wash': { color: "bg-orange-100 text-orange-800", labelKey: "Sent to Wash", Icon: FaWater },
+  'in wash': { color: "bg-blue-100 text-blue-800", labelKey: "In Wash", Icon: FaSpinner },
+  'washed': { color: "bg-indigo-100 text-indigo-800", labelKey: "Washed", Icon: FaCheckCircle },
+  'picked by client': { color: "bg-green-100 text-green-800", labelKey: "Picked by Client", Icon: FaUserCheck },
+  'pending delivery': { color: "bg-yellow-100 text-yellow-800", labelKey: "Pending Delivery", Icon: FaTruck },
+  'delivered': { color: "bg-green-100 text-green-800", labelKey: "Delivered", Icon: FaCheck },
+  'cancelled': { color: "bg-red-100 text-red-800", labelKey: "Cancelled", Icon: FaTimes },
+  'refunded': { color: "bg-red-100 text-red-800", labelKey: "Refunded", Icon: FaUndo },
 };
 
 const PAYMENT_STATUS_META: Record<
   'pending' | 'partially_paid' | 'paid' | 'failed',
   { color: string; labelKey: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
 > = {
-  pending: { color: "bg-yellow-100 text-yellow-800", labelKey: "orders.paymentStatus.pending", Icon: FaClock },
-  partially_paid: { color: "bg-blue-100 text-blue-800", labelKey: "orders.paymentStatus.partiallyPaid", Icon: FaSpinner },
-  paid: { color: "bg-green-100 text-green-800", labelKey: "orders.paymentStatus.paid", Icon: FaCheckCircle },
-  failed: { color: "bg-red-100 text-red-800", labelKey: "orders.paymentStatus.failed", Icon: FaExclamationTriangle },
+  pending: { color: "bg-yellow-100 text-yellow-800", labelKey: "Pending", Icon: FaClock },
+  partially_paid: { color: "bg-blue-100 text-blue-800", labelKey: "Partially Paid", Icon: FaSpinner },
+  paid: { color: "bg-green-100 text-green-800", labelKey: "Paid", Icon: FaCheckCircle },
+  failed: { color: "bg-red-100 text-red-800", labelKey: "Failed", Icon: FaExclamationTriangle },
 };
 
 export default function OrderManagement(): JSX.Element {
@@ -83,6 +105,7 @@ export default function OrderManagement(): JSX.Element {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
+  const [chartTimeFilter, setChartTimeFilter] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,7 +129,7 @@ export default function OrderManagement(): JSX.Element {
   // Function to map backend order to display format
   const mapBackendOrderToDisplay = (backendOrder: BackendOrder): DisplayOrder => {
     const services = backendOrder.services || [];
-    const items = services.map((service: { service_type: string; quantity: number }) =>
+    const items = services.map((service: OrderItemType) =>
       `${service.service_type} (${service.quantity})`
     );
 
@@ -125,7 +148,7 @@ export default function OrderManagement(): JSX.Element {
 
     return {
       id: backendOrder.order_id.toString(),
-      customerName: "Customer", // User ID is available but name is not in Order interface
+      customerName: backendOrder.customer_name || "Customer",
       customerPhone: "N/A", // Not available in current backend model
       service: services.length > 0 ? services[0].service_type : "Mixed Services",
       items,
@@ -135,7 +158,7 @@ export default function OrderManagement(): JSX.Element {
       deliveryDate: backendOrder.delivery_date || undefined,
       branchId: backendOrder.branch.toString(),
       branchName: backendOrder.branch_name || "Main Branch",
-      notes: undefined, // Description not available in Order interface
+      notes: backendOrder.description,
       paymentMethod: backendOrder.payment_method,
       paymentStatus: backendOrder.payment_status,
     };
@@ -186,12 +209,17 @@ export default function OrderManagement(): JSX.Element {
 
   const statusCounts = useMemo(() => {
     const map: Record<OrderStatus, number> = {
+      'dropped by user': 0,
       'pending pickup': 0,
-      pending: 0,
-      'in progress': 0,
-      'to be delivered': 0,
-      completed: 0,
-      cancelled: 0,
+      'picked up': 0,
+      'sent to wash': 0,
+      'in wash': 0,
+      'washed': 0,
+      'picked by client': 0,
+      'pending delivery': 0,
+      'delivered': 0,
+      'cancelled': 0,
+      'refunded': 0,
     };
     orders.forEach((o) => {
       if (o.status in map) {
@@ -204,15 +232,41 @@ export default function OrderManagement(): JSX.Element {
   // For charts: revenue by branch
   const revenueByBranch = useMemo(() => {
     const map = new Map<string, { branchName: string; revenue: number; orders: number }>();
-    orders.forEach((o) => {
+    
+    // Filter orders based on time filter
+    const now = new Date();
+    const filteredOrdersByTime = orders.filter(o => {
+      const orderDate = new Date(o.receivedDate);
+      switch (chartTimeFilter) {
+        case 'daily':
+          return orderDate.toDateString() === now.toDateString();
+        case 'weekly':
+          const weekAgo = new Date(now);
+          weekAgo.setDate(now.getDate() - 7);
+          return orderDate >= weekAgo;
+        case 'monthly':
+          return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+        case 'yearly':
+          return orderDate.getFullYear() === now.getFullYear();
+        default:
+          return true;
+      }
+    });
+
+    filteredOrdersByTime.forEach((o) => {
       const k = o.branchId;
       if (!map.has(k)) map.set(k, { branchName: o.branchName, revenue: 0, orders: 0 });
       const cur = map.get(k)!;
       cur.revenue += o.amount;
       cur.orders += 1;
     });
-    return Array.from(map.entries()).map(([branchId, v]) => ({ branchId, name: v.branchName, revenue: v.revenue, orders: v.orders }));
-  }, [orders]);
+    return Array.from(map.entries()).map(([branchId, v]) => ({ 
+      branchId, 
+      name: v.branchName, 
+      revenue: v.revenue, 
+      orders: v.orders 
+    }));
+  }, [orders, chartTimeFilter]);
 
   // UI helpers
   const openAdd = () => setIsAddOpen(true);
@@ -270,7 +324,6 @@ export default function OrderManagement(): JSX.Element {
         total_amount: orderAmount,
         payment_method: form.paymentMethod as 'cash' | 'bank' | 'esewa',
         payment_status: 'pending' as const,
-        status: 'pending' as const,
         description: form.notes || ''
       };
 
@@ -402,11 +455,21 @@ export default function OrderManagement(): JSX.Element {
   // Small status badge
   const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
     const meta = STATUS_META[status];
+    // Safety check for unknown statuses
+    if (!meta) {
+      console.warn(`Unknown status encountered: ${status}`);
+      return (
+        <span className="inline-flex items-center gap-2 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+          <FaExclamationTriangle className="w-3 h-3" />
+          <span>{status}</span>
+        </span>
+      );
+    }
     const Icon = meta.Icon;
     return (
       <span className={`inline-flex items-center gap-2 px-2 py-1 text-xs rounded-full ${meta.color}`}>
         <Icon className="w-3 h-3" />
-        <span>{t(meta.labelKey)}</span>
+        <span>{meta.labelKey}</span>
       </span>
     );
   };
@@ -418,7 +481,7 @@ export default function OrderManagement(): JSX.Element {
     return (
       <span className={`inline-flex items-center gap-2 px-2 py-1 text-xs rounded-full ${meta.color}`}>
         <Icon className="w-3 h-3" />
-        <span>{t(meta.labelKey)}</span>
+        <span>{meta.labelKey}</span>
       </span>
     );
   };
@@ -426,14 +489,14 @@ export default function OrderManagement(): JSX.Element {
   const pieData = useMemo(
     () =>
       (Object.keys(statusCounts) as OrderStatus[]).map((k) => ({
-        name: t(STATUS_META[k].labelKey),
+        name: STATUS_META[k] ? STATUS_META[k].labelKey : k,
         value: statusCounts[k],
         key: k,
       })),
-    [statusCounts, t]
+    [statusCounts]
   );
 
-  const COLORS = ["#3B82F6", "#F59E0B", "#10B981", "#6B7280"];
+  const COLORS = ["#3B82F6", "#F59E0B", "#10B981", "#6B7280", "#8B5CF6", "#EC4899", "#6366F1"];
 
   return (
     <div className="space-y-6 p-4">
@@ -481,12 +544,17 @@ export default function OrderManagement(): JSX.Element {
             aria-label={t("orders.filterByStatus", "Filter by status")}
           >
             <option value="all">{t("orders.filter.all", "All Status")}</option>
+            <option value="dropped by user">Dropped By User</option>
             <option value="pending pickup">Pending Pickup</option>
-            <option value="pending">{t("orders.status.pending")}</option>
-            <option value="in progress">{t("orders.status.processing")}</option>
-            <option value="to be delivered">{t("orders.status.outForDelivery")}</option>
-            <option value="completed">{t("orders.status.completed")}</option>
-            <option value="cancelled">{t("orders.status.cancelled")}</option>
+            <option value="picked up">Picked Up</option>
+            <option value="sent to wash">Sent to Wash</option>
+            <option value="in wash">In Wash</option>
+            <option value="washed">Washed</option>
+            <option value="picked by client">Picked By Client</option>
+            <option value="pending delivery">Pending Delivery</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="refunded">Refunded</option>
           </select>
 
           <select
@@ -496,10 +564,10 @@ export default function OrderManagement(): JSX.Element {
             aria-label={t("orders.filterByPaymentStatus", "Filter by payment status")}
           >
             <option value="all">{t("orders.filter.allPayment", "All Payment Status")}</option>
-            <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
-            <option value="partially_paid">{t("orders.paymentStatus.partiallyPaid", "Partially Paid")}</option>
-            <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
-            <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
+            <option value="pending">Pending</option>
+            <option value="partially_paid">Partially Paid</option>
+            <option value="paid">Paid</option>
+            <option value="failed">Failed</option>
           </select>
 
           <button
@@ -516,17 +584,38 @@ export default function OrderManagement(): JSX.Element {
       {/* Top charts & summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 p-4 border rounded-lg shadow-sm bg-white">
-          <h2 className="text-lg font-semibold mb-3">{t("orders.revenueByBranch", "Revenue by Branch")}</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Revenue & Orders by Branch</h2>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-600">Time Period:</label>
+              <select
+                value={chartTimeFilter}
+                onChange={(e) => setChartTimeFilter(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
+                className="px-2 py-1 text-sm border rounded-md bg-white"
+              >
+                <option value="daily">Today</option>
+                <option value="weekly">This Week</option>
+                <option value="monthly">This Month</option>
+                <option value="yearly">This Year</option>
+              </select>
+            </div>
+          </div>
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={revenueByBranch}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="revenue" name={t("orders.chart.revenue", "Revenue (₨)")} fill="#8884d8" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="orders" name={t("orders.chart.orders", "Orders")} fill="#82ca9d" radius={[6, 6, 0, 0]} />
+                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                <Tooltip 
+                  formatter={(value: number, name: string) => {
+                    if (name === "Revenue (₨)") return [`₨${value.toLocaleString()}`, name];
+                    return [value, name];
+                  }}
+                />
                 <Legend />
+                <Bar yAxisId="left" dataKey="revenue" name="Revenue (₨)" fill="#8884d8" radius={[6, 6, 0, 0]} />
+                <Bar yAxisId="right" dataKey="orders" name="Orders" fill="#82ca9d" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -594,12 +683,17 @@ export default function OrderManagement(): JSX.Element {
                         aria-label={t("orders.changeStatus", "Change status")}
                         className="px-2 py-1 border rounded-md text-xs"
                       >
+                        <option value="dropped by user">Dropped By User</option>
                         <option value="pending pickup">Pending Pickup</option>
-                        <option value="pending">{t("orders.status.pending")}</option>
-                        <option value="in progress">{t("orders.status.processing")}</option>
-                        <option value="to be delivered">{t("orders.status.outForDelivery")}</option>
-                        <option value="completed">{t("orders.status.completed")}</option>
-                        <option value="cancelled">{t("orders.status.cancelled")}</option>
+                        <option value="picked up">Picked Up</option>
+                        <option value="sent to wash">Sent to Wash</option>
+                        <option value="in wash">In Wash</option>
+                        <option value="washed">Washed</option>
+                        <option value="picked by client">Picked By Client</option>
+                        <option value="pending delivery">Pending Delivery</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="refunded">Refunded</option>
                       </select>
                     </div>
                   </td>
@@ -612,10 +706,10 @@ export default function OrderManagement(): JSX.Element {
                         aria-label={t("orders.changePaymentStatus", "Change payment status")}
                         className="px-2 py-1 border rounded-md text-xs"
                       >
-                        <option value="pending">{t("orders.paymentStatus.pending", "Pending")}</option>
-                        <option value="partially_paid">{t("orders.paymentStatus.partiallyPaid", "Partially Paid")}</option>
-                        <option value="paid">{t("orders.paymentStatus.paid", "Paid")}</option>
-                        <option value="failed">{t("orders.paymentStatus.failed", "Failed")}</option>
+                        <option value="pending">Pending</option>
+                        <option value="partially_paid">Partially Paid</option>
+                        <option value="paid">Paid</option>
+                        <option value="failed">Failed</option>
                       </select>
                     </div>
                   </td>
@@ -659,19 +753,41 @@ export default function OrderManagement(): JSX.Element {
       </div>
 
       {/* Status summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {(["pending pickup", "pending", "in progress", "to be delivered", "completed", "cancelled"] as OrderStatus[]).map((k, idx) => (
-          <div key={k} className="p-4 border rounded-lg bg-white shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">{t(STATUS_META[k].labelKey)}</div>
-              <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        {(["pending pickup", "picked up", "in wash", "washed", "pending delivery", "delivered"] as OrderStatus[]).map((k, idx) => {
+          const meta = STATUS_META[k];
+          if (!meta) return null;
+          const Icon = meta.Icon;
+          return (
+            <div key={k} className="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon className={`w-4 h-4 ${meta.color.split(' ')[1]}`} />
+                <div className="text-xs font-medium text-gray-600 truncate">{meta.labelKey}</div>
+              </div>
+              <div className="text-2xl font-bold">{statusCounts[k] ?? 0}</div>
+              <div className={`mt-2 h-1 rounded-full`} style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
             </div>
-            <div className="mt-2 text-2xl font-semibold">{statusCounts[k] ?? 0}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Add Order Modal (simple) */}
+      {/* Additional status cards (less common statuses) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {(["dropped by user", "sent to wash", "picked by client", "cancelled", "refunded"] as OrderStatus[]).map((k) => {
+          const meta = STATUS_META[k];
+          if (!meta) return null;
+          const Icon = meta.Icon;
+          return (
+            <div key={k} className="p-3 border rounded-lg bg-gray-50 hover:bg-white transition-colors">
+              <div className="flex items-center gap-2 mb-1">
+                <Icon className={`w-3 h-3 ${meta.color.split(' ')[1]}`} />
+                <div className="text-xs font-medium text-gray-500 truncate">{meta.labelKey}</div>
+              </div>
+              <div className="text-xl font-semibold text-gray-700">{statusCounts[k] ?? 0}</div>
+            </div>
+          );
+        })}
+      </div>      {/* Add Order Modal (simple) */}
       {isAddOpen && (
         <div
           role="dialog"

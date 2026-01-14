@@ -125,35 +125,6 @@ class BranchManagerCreateView(generics.CreateAPIView):
     serializer_class = BranchManagerSerializer
     permission_classes = [IsAdmin]
 
-    def perform_create(self, serializer):
-        """Override to create user along with branch manager."""
-        # Extract user data from the request
-        user_data = {
-            'email': self.request.data.get('email'),
-            'password': self.request.data.get('password'),
-            'first_name': self.request.data.get('first_name'),
-            'last_name': self.request.data.get('last_name'),
-            'phone': self.request.data.get('phone'),
-            'role': 'branch_manager'
-        }
-        
-        # Create the user first
-        from users.models import User
-        from django.contrib.auth.hashers import make_password
-        
-        user = User.objects.create(
-            email=user_data['email'],
-            password=make_password(user_data['password']),
-            first_name=user_data['first_name'],
-            last_name=user_data['last_name'],
-            phone=user_data.get('phone', ''),
-            role='branch_manager',
-            is_verified=True  # Auto-verify for admin-created accounts
-        )
-        
-        # Create the branch manager with the user
-        serializer.save(user=user)
-
 class BranchManagerDetailView(generics.RetrieveAPIView):
     """View to retrieve details of a specific branch manager."""
     queryset = BranchManager.objects.all()
@@ -166,8 +137,258 @@ class BranchManagerUpdateView(generics.UpdateAPIView):
     serializer_class = BranchManagerSerializer
     permission_classes = [IsAdmin]
 
+
 class BranchManagerDeleteView(generics.DestroyAPIView):
     """View to delete a specific branch manager - Admin only."""
     queryset = BranchManager.objects.all()
     serializer_class = BranchManagerSerializer
     permission_classes = [IsAdmin]
+
+class BranchOverallPerformanceView(generics.GenericAPIView):
+    """View to get overall branch performance statistics over time."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        from rest_framework.response import Response
+        from django.db.models import Sum
+        from django.db.models.functions import TruncDay, TruncMonth
+        from django.utils import timezone
+        import datetime
+        from accounting.models import Income, Expense
+
+        time_range = request.query_params.get('range', '7d')
+        now = timezone.now()
+        
+        # Define time range and grouping
+        if time_range == 'today':
+            start_date = now - datetime.timedelta(days=1)
+            trunc_func = TruncDay
+            date_field_income = 'date_received'
+            date_field_expense = 'date_incurred'
+        elif time_range == '7d':
+            start_date = now - datetime.timedelta(days=7)
+            trunc_func = TruncDay
+            date_field_income = 'date_received'
+            date_field_expense = 'date_incurred'
+        elif time_range == '1m':
+            start_date = now - datetime.timedelta(days=30)
+            trunc_func = TruncDay
+            date_field_income = 'date_received'
+            date_field_expense = 'date_incurred'
+        elif time_range == '1y':
+            start_date = now - datetime.timedelta(days=365)
+            trunc_func = TruncMonth
+            date_field_income = 'date_received'
+            date_field_expense = 'date_incurred'
+        else: # Default 7d
+            start_date = now - datetime.timedelta(days=7)
+            trunc_func = TruncDay
+            date_field_income = 'date_received'
+            date_field_expense = 'date_incurred'
+
+        # Filter and Aggregate Income
+        income_qs = Income.objects.filter(**{f"{date_field_income}__gte": start_date})
+        
+        # Check permissions - filter by branch if manager
+        if hasattr(request.user, 'branchmanager') and request.user.role == 'branch_manager':
+            income_qs = income_qs.filter(branch=request.user.branchmanager.branch)
+            
+        income_data = income_qs.annotate(
+            period=trunc_func(date_field_income)
+        ).values('period').annotate(
+            total=Sum('amount')
+        ).order_by('period')
+
+        # Filter and Aggregate Expenses
+        expense_qs = Expense.objects.filter(**{f"{date_field_expense}__gte": start_date})
+
+        # Check permissions - filter by branch if manager
+        if hasattr(request.user, 'branchmanager') and request.user.role == 'branch_manager':
+            expense_qs = expense_qs.filter(branch=request.user.branchmanager.branch)
+
+        expense_data = expense_qs.annotate(
+            period=trunc_func(date_field_expense)
+        ).values('period').annotate(
+            total=Sum('amount')
+        ).order_by('period')
+
+        # Merge Data
+        performance_data = {}
+        
+        # Format dates matches the TruncMonth/Day output
+        for entry in income_data:
+            period = entry['period'].strftime('%Y-%m-%d')
+            if period not in performance_data:
+                performance_data[period] = {'date': period, 'revenue': 0, 'expenses': 0}
+            performance_data[period]['revenue'] = float(entry['total'] or 0)
+
+        for entry in expense_data:
+            period = entry['period'].strftime('%Y-%m-%d')
+            if period not in performance_data:
+                performance_data[period] = {'date': period, 'revenue': 0, 'expenses': 0}
+            performance_data[period]['expenses'] = float(entry['total'] or 0)
+
+        # Calculate Profit
+        result = []
+        for period in sorted(performance_data.keys()):
+            data = performance_data[period]
+            data['profit'] = data['revenue'] - data['expenses']
+            result.append(data)
+
+        return Response(result)
+
+class BranchPerformanceView(generics.GenericAPIView):
+    """View to get performance statistics for a specific branch over time."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        from rest_framework.response import Response
+        from django.db.models import Sum, Count
+        from django.db.models.functions import TruncDay, TruncMonth
+        from django.utils import timezone
+        import datetime
+        from accounting.models import Income, Expense
+        from orders.models import Order
+        
+        # Verify branch exists
+        try:
+            branch = Branch.objects.get(pk=pk)
+        except Branch.DoesNotExist:
+            return Response({'error': 'Branch not found'}, status=404)
+            
+        # Permission check: Branch manager can only see their own branch
+        if hasattr(request.user, 'branchmanager') and request.user.role == 'branch_manager':
+            if request.user.branchmanager.branch.id != int(pk):
+                return Response({'error': 'Permission denied'}, status=403)
+
+        time_range = request.query_params.get('range', '6m') # Default 6 months for detailed view
+        now = timezone.now()
+        
+        # Define time range
+        if time_range == '1m':
+             start_date = now - datetime.timedelta(days=30)
+             trunc_func = TruncDay
+             orders_trunc = TruncDay
+             date_format = '%Y-%m-%d'
+        elif time_range == '1y':
+             start_date = now - datetime.timedelta(days=365)
+             trunc_func = TruncMonth
+             orders_trunc = TruncMonth
+             date_format = '%Y-%m-%d' # Will format as YYYY-MM-01
+        else: # Default 6m (custom logic for "monthly" view usually expected on detailed pages)
+             start_date = now - datetime.timedelta(days=180)
+             trunc_func = TruncMonth
+             orders_trunc = TruncMonth
+             date_format = '%Y-%m-%d'
+
+        # 1. Income
+        income_data = Income.objects.filter(
+            branch=branch, 
+            date_received__gte=start_date
+        ).annotate(
+            period=trunc_func('date_received')
+        ).values('period').annotate(
+            total=Sum('amount')
+        ).order_by('period')
+
+        # 2. Expenses
+        expense_data = Expense.objects.filter(
+            branch=branch,
+            date_incurred__gte=start_date
+        ).annotate(
+            period=trunc_func('date_incurred')
+        ).values('period').annotate(
+            total=Sum('amount')
+        ).order_by('period')
+
+        # 3. Orders (Count)
+        orders_data = Order.objects.filter(
+            branch=branch,
+            created_at__gte=start_date
+        ).annotate(
+            period=orders_trunc('created_at')
+        ).values('period').annotate(
+            count=Count('order_id')
+        ).order_by('period')
+
+        # Merge Data
+        merged_data = {}
+
+        def add_to_merged(queryset, key, value_key):
+            for entry in queryset:
+                period = entry['period'].strftime('%Y-%m') # Key by Month
+                if time_range == '1m':
+                    period = entry['period'].strftime('%Y-%m-%d') # Key by Day
+
+                if period not in merged_data:
+                    merged_data[period] = {
+                        'month': entry['period'].strftime('%b') if time_range != '1m' else entry['period'].strftime('%d %b'),
+                        'full_date': period,
+                        'revenue': 0, 
+                        'expenses': 0, 
+                        'orders': 0
+                    }
+                merged_data[period][key] = float(entry[value_key] or 0)
+
+        add_to_merged(income_data, 'revenue', 'total')
+        add_to_merged(expense_data, 'expenses', 'total')
+        add_to_merged(orders_data, 'orders', 'count')
+
+        # Sort and return list
+        result = [merged_data[k] for k in sorted(merged_data.keys())]
+        return Response(result)
+
+class BranchExpenseBreakdownView(generics.GenericAPIView):
+    """View to get expense breakdown by category for a specific branch."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        from rest_framework.response import Response
+        from django.db.models import Sum
+        from accounting.models import Expense
+        from django.utils import timezone
+        import datetime
+        
+         # Verify branch exists
+        try:
+            branch = Branch.objects.get(pk=pk)
+        except Branch.DoesNotExist:
+            return Response({'error': 'Branch not found'}, status=404)
+
+        # Permission check
+        if hasattr(request.user, 'branchmanager') and request.user.role == 'branch_manager':
+            if request.user.branchmanager.branch.id != int(pk):
+                return Response({'error': 'Permission denied'}, status=403)
+
+        time_range = request.query_params.get('range', '1m') # Default this month
+        now = timezone.now()
+
+        if time_range == '1m':
+            start_date = now - datetime.timedelta(days=30)
+        elif time_range == '1y':
+            start_date = now - datetime.timedelta(days=365)
+        else:
+             start_date = now - datetime.timedelta(days=30)
+
+        breakdown = Expense.objects.filter(
+            branch=branch,
+            date_incurred__gte=start_date
+        ).values('category__name').annotate(
+            value=Sum('amount')
+        ).order_by('-value')
+
+        # Format for Recharts (name, value, color - optional)
+        # We'll generate colors on frontend or hardcode a palette here
+        result = []
+        colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+        
+        for i, item in enumerate(breakdown):
+            name = item['category__name'] or 'Uncategorized'
+            result.append({
+                'name': name,
+                'value': float(item['value']),
+                'color': colors[i % len(colors)]
+            })
+
+        return Response(result)
+

@@ -28,23 +28,57 @@ class IncomeViewSet(viewsets.ModelViewSet):
     """ViewSet for handling income records."""
     # pylint: disable=no-member
     pagination_class = PageNumberPagination
-    queryset = Income.objects.all().order_by('-date_received')
+    queryset = Income.objects.select_related('branch', 'category').all().order_by('-date_received')
     serializer_class = IncomeSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['branch', 'date_received', 'category']
 
+    def get_queryset(self):
+        """Optimize queryset with filters."""
+        queryset = super().get_queryset()
+        
+        # Filter by date range
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        
+        if start_date:
+            queryset = queryset.filter(date_received__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date_received__lte=end_date)
+        
+        return queryset
+
     @action(detail=False, methods=['get'])
     def by_time(self, request):
-        """period=daily|weekly|monthly|yearly
-        &branch=1
-        &year=2024&month=7&day=22
+        """Get income grouped by time period.
+        Query params:
+        - period: daily|weekly|monthly|yearly (default: daily)
+        - branch: branch ID (optional)
+        - start_date: YYYY-MM-DD (optional)
+        - end_date: YYYY-MM-DD (optional)
+        - limit: number of periods to return (default: 30 for daily, 12 for weekly/monthly, 5 for yearly)
         """
         period = request.query_params.get('period', 'daily')
-        qs = self.queryset
-
-        if branch_id := request.query_params.get('branch'):
+        branch_id = request.query_params.get('branch')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        # Set default limits based on period
+        default_limits = {'daily': 30, 'weekly': 12, 'monthly': 12, 'yearly': 5}
+        limit = int(request.query_params.get('limit', default_limits.get(period, 30)))
+        
+        # Start with optimized queryset
+        qs = Income.objects.all()
+        
+        # Apply filters
+        if branch_id:
             qs = qs.filter(branch_id=branch_id)
-
+        if start_date:
+            qs = qs.filter(date_received__gte=start_date)
+        if end_date:
+            qs = qs.filter(date_received__lte=end_date)
+        
+        # Group by period
         if period == 'weekly':
             qs = qs.annotate(period=TruncWeek('date_received'))
         elif period == 'monthly':
@@ -53,9 +87,104 @@ class IncomeViewSet(viewsets.ModelViewSet):
             qs = qs.annotate(period=TruncYear('date_received'))
         else:  # daily
             qs = qs.annotate(period=models.F('date_received'))
-
-        data = qs.values('period').annotate(total=Sum('amount')).order_by('-period')
-        return Response(data)
+        
+        # Aggregate and limit
+        data = qs.values('period').annotate(
+            total=Sum('amount'),
+            count=models.Count('id')
+        ).order_by('-period')[:limit]
+        
+        return Response(list(data))
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get income statistics.
+        Query params:
+        - period: daily|weekly|monthly|yearly (default: monthly)
+        - branch: branch ID (optional)
+        """
+        period = request.query_params.get('period', 'monthly')
+        branch_id = request.query_params.get('branch')
+        today = timezone.now().date()
+        
+        # Build base queryset
+        qs = Income.objects.all()
+        if branch_id:
+            qs = qs.filter(branch_id=branch_id)
+        
+        # Calculate date ranges
+        if period == 'daily':
+            current_start = today
+            previous_start = today - timedelta(days=1)
+            previous_end = today - timedelta(days=1)
+        elif period == 'weekly':
+            current_start = today - timedelta(days=today.weekday())
+            previous_start = current_start - timedelta(days=7)
+            previous_end = current_start - timedelta(days=1)
+        elif period == 'yearly':
+            current_start = today.replace(month=1, day=1)
+            previous_start = current_start.replace(year=current_start.year - 1)
+            previous_end = current_start - timedelta(days=1)
+        else:  # monthly
+            current_start = today.replace(day=1)
+            if current_start.month == 1:
+                previous_start = current_start.replace(year=current_start.year - 1, month=12)
+            else:
+                previous_start = current_start.replace(month=current_start.month - 1)
+            previous_end = current_start - timedelta(days=1)
+        
+        # Get current period stats
+        current_income = qs.filter(
+            date_received__gte=current_start,
+            date_received__lte=today
+        ).aggregate(
+            total=Sum('amount'),
+            count=models.Count('id'),
+            avg=models.Avg('amount')
+        )
+        
+        # Get previous period stats for comparison
+        previous_income = qs.filter(
+            date_received__gte=previous_start,
+            date_received__lte=previous_end
+        ).aggregate(
+            total=Sum('amount'),
+            count=models.Count('id')
+        )
+        
+        # Calculate growth percentage
+        current_total = current_income['total'] or 0
+        previous_total = previous_income['total'] or 0
+        growth_percentage = 0
+        if previous_total > 0:
+            growth_percentage = ((current_total - previous_total) / previous_total) * 100
+        
+        # Get payment method breakdown (from payment reference)
+        payment_methods = {}
+        income_records = qs.filter(date_received__gte=current_start, date_received__lte=today)
+        for income in income_records.select_related('payment'):
+            if hasattr(income, 'payment') and income.payment:
+                method = income.payment.payment_type
+                payment_methods[method] = payment_methods.get(method, 0) + float(income.amount)
+        
+        return Response({
+            'period': period,
+            'current_period': {
+                'total': current_total,
+                'count': current_income['count'] or 0,
+                'average': float(current_income['avg'] or 0),
+                'start_date': current_start.isoformat(),
+                'end_date': today.isoformat(),
+            },
+            'previous_period': {
+                'total': previous_total,
+                'count': previous_income['count'] or 0,
+                'start_date': previous_start.isoformat(),
+                'end_date': previous_end.isoformat(),
+            },
+            'growth_percentage': round(growth_percentage, 2),
+            'payment_methods': payment_methods,
+        })
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
@@ -227,3 +356,54 @@ class FullAccountingView(APIView):
 
         serializer = FullAccountingSerializer(full_report)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class BranchFinancialSummaryView(APIView):
+    """View for generating financial summary by branch showing income and expenses."""
+    
+    def get(self, request):
+        """Get financial summary for all branches or a specific branch."""
+        branch_id = request.query_params.get('branch_id')
+        
+        # Filter by branch if specified
+        if branch_id:
+            branches = Branch.objects.filter(id=branch_id, status='active')
+        else:
+            branches = Branch.objects.filter(status='active')
+        
+        summary = []
+        for branch in branches:
+            # Get income and expense totals for this branch
+            total_income = Income.objects.filter(branch=branch).aggregate(
+                total=Sum('amount')
+            )['total'] or 0
+            
+            total_expense = Expense.objects.filter(branch=branch).aggregate(
+                total=Sum('amount')
+            )['total'] or 0
+            
+            # Count of income records from payments vs manual
+            income_from_payments = Income.objects.filter(
+                branch=branch,
+                payment__isnull=False
+            ).count()
+            
+            income_manual = Income.objects.filter(
+                branch=branch,
+                payment__isnull=True
+            ).count()
+            
+            summary.append({
+                'branch_id': branch.id,
+                'branch_name': branch.name,
+                'total_income': total_income,
+                'total_expense': total_expense,
+                'net_profit': total_income - total_expense,
+                'income_records_from_payments': income_from_payments,
+                'income_records_manual': income_manual,
+            })
+        
+        return Response({
+            'branches': summary,
+            'total_branches': len(summary)
+        }, status=status.HTTP_200_OK)

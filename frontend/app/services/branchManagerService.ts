@@ -9,17 +9,29 @@ export interface BranchManager {
   user: number;
   user_email: string;
   user_name: string;
+  user_phone?: string;
+  user_first_name?: string;
+  user_last_name?: string;
   branch: number;
   branch_name: string;
   salary: number;
   hired_date: string;
   leaving_date?: string;
-  id_type: 'citizenship' | 'national_id' | 'drivers_licence';
+  id_type: 'citizenship' | 'national_id' | 'drivers_licence' | 'passport';
   citizenship_number: string;
   is_active: boolean;
   created: string;
   modified: string;
+  // Legacy field kept for backward compatibility
   phone?: string;
+}
+
+// Paginated response type
+export interface PaginatedBranchManagerResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BranchManager[];
 }
 
 export interface BranchManagerFormData {
@@ -32,20 +44,18 @@ export interface BranchManagerFormData {
   salary: number;
   hired_date: string;
   leaving_date?: string;
-  id_type: 'citizenship' | 'national_id' | 'drivers_licence';
+  id_type: 'citizenship' | 'national_id' | 'drivers_licence' | 'passport';
   citizenship_number: string;
-  manager_id?: string;
 }
 
 export interface BranchManagerUpdateData {
   first_name: string;
   last_name: string;
-  phone: string;
   branch: number;
   salary: number;
   hired_date: string;
   leaving_date?: string;
-  id_type: 'citizenship' | 'national_id' | 'drivers_licence';
+  id_type: 'citizenship' | 'national_id' | 'drivers_licence' | 'passport';
   citizenship_number: string;
   is_active: boolean;
 }
@@ -68,19 +78,23 @@ export const branchManagerAPI = {
     if (params?.ordering) queryParams.append('ordering', params.ordering);
 
     const endpoint = `/branch/branch-managers/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-    const response = await api.get(endpoint);
-    return response.data;
+    const response = await api.get<PaginatedBranchManagerResponse | BranchManager[]>(endpoint);
+    
+    // Handle both paginated and non-paginated responses
+    if (Array.isArray(response.data)) {
+      return response.data;
+    } else if (response.data && typeof response.data === 'object' && 'results' in response.data) {
+      return (response.data as PaginatedBranchManagerResponse).results;
+    }
+    
+    // If response.data is not an array or paginated response, log warning and return empty array
+    console.warn('BranchManagerAPI.list did not return an array or paginated response:', response.data);
+    return [];
   },
 
   // Create a new branch manager
   create: async (data: BranchManagerFormData): Promise<BranchManager> => {
-    // Generate manager ID if not provided
-    const managerData = {
-      ...data,
-      manager_id: data.manager_id || `MGR-${Date.now().toString().slice(-6)}`,
-    };
-
-    const response = await api.post('/branch/branch-managers/create/', managerData);
+    const response = await api.post('/branch/branch-managers/create/', data);
     return response.data;
   },
 

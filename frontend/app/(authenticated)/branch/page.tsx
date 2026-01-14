@@ -31,10 +31,9 @@ import {
   Legend,
 } from "recharts";
 import { branchAPI, Branch } from "../../services/branchService";
+import { useAuth } from "../../contexts/AuthContext";
 
-interface User {
-  role: 'admin' | 'branch_manager' | 'customer' | 'rider' | 'accountant';
-}
+
 
 export default function BranchManagement() {
   const { t } = useTranslation();
@@ -49,33 +48,57 @@ export default function BranchManagement() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Mock user data - replace with actual auth context
-  const [user] = useState<User>({ role: 'admin' });
+  // Performance Chart State
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [chartRange, setChartRange] = useState('7d');
+  const [loadingChart, setLoadingChart] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchBranches();
+    fetchPerformanceData();
   }, []);
+
+  // Fetch performance data when range changes
+  useEffect(() => {
+    fetchPerformanceData();
+  }, [chartRange]);
+
+  const fetchPerformanceData = async () => {
+    try {
+      setLoadingChart(true);
+      const data = await branchAPI.getOverallPerformance(chartRange);
+      setPerformanceData(data);
+    } catch (error) {
+      console.error("Error fetching performance data:", error);
+      // Don't block the whole page if just charts fail, but log it possibly to a toast or just console
+    } finally {
+      setLoadingChart(false);
+    }
+  };
 
   const fetchBranches = async () => {
     try {
       setLoading(true);
       console.log('Starting to fetch branches...');
-      
+
       const branchesArray = await branchAPI.list();
       console.log('Fetched branches array:', branchesArray);
       console.log('Number of branches:', branchesArray.length);
-      
+
       setBranches(branchesArray);
       setFilteredBranches(branchesArray);
     } catch (error: unknown) {
       console.error('Error fetching branches:', error);
-      
+
       // Set empty array to prevent map errors
       setBranches([]);
       setFilteredBranches([]);
-      
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Error fetching branches: ${errorMessage}`);
+      setError(`Error fetching branches: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -92,7 +115,7 @@ export default function BranchManagement() {
       setFilteredBranches([]);
       return;
     }
-    
+
     let filtered = [...branches];
 
     // Apply search filter
@@ -147,7 +170,7 @@ export default function BranchManagement() {
   };
 
   const handleDeleteBranch = async (branchId: number) => {
-    if (user.role !== 'admin') {
+    if (user?.role !== 'admin') {
       alert('Only admins can delete branches');
       return;
     }
@@ -185,14 +208,14 @@ export default function BranchManagement() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t("branches.title")}</h1>
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={fetchBranches}
             className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
           >
             🔄 Refresh
           </button>
-          {user.role === 'admin' && (
-            <button 
+          {user?.role === 'admin' && (
+            <button
               onClick={() => router.push("/branch/add")}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
@@ -299,6 +322,71 @@ export default function BranchManagement() {
         )}
       </div>
 
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performance Overview */}
+      <div className="bg-white rounded-lg border shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">Performance Analytics</h2>
+          <select
+            value={chartRange}
+            onChange={(e) => setChartRange(e.target.value)}
+            className="px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="today">Today</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="1m">This Month</option>
+            <option value="1y">This Year</option>
+          </select>
+        </div>
+
+        {loadingChart ? (
+          <div className="h-72 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : performanceData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={performanceData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(value) => {
+                  if (chartRange === '1y') return new Date(value).toLocaleDateString(undefined, { month: 'short' });
+                  return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+                }}
+              />
+              <YAxis />
+              <Tooltip
+                formatter={(value) => `₨ ${Number(value).toLocaleString()}`}
+                labelFormatter={(label) => new Date(label).toLocaleDateString()}
+              />
+              <Legend />
+              <Bar dataKey="revenue" fill="#3B82F6" name="Revenue" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expenses" fill="#EF4444" name="Expenses" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-72 flex flex-col items-center justify-center text-gray-400">
+            <FaChartLine className="h-12 w-12 mb-2 opacity-20" />
+            <p>No performance data available for this period</p>
+          </div>
+        )}
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="p-4 border rounded-lg shadow-sm bg-blue-50">
@@ -363,11 +451,10 @@ export default function BranchManagement() {
                   <h3 className="font-medium text-lg">{branch.name}</h3>
                   <span className="text-sm text-gray-500">({branch.branch_id})</span>
                   <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      branch.status === "active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
+                    className={`text-xs px-2 py-1 rounded-full ${branch.status === "active"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700"
+                      }`}
                   >
                     {branch.status}
                   </span>
@@ -416,7 +503,7 @@ export default function BranchManagement() {
                   >
                     <FaEye />
                   </button>
-                  {user.role === 'admin' && (
+                  {user?.role === 'admin' && (
                     <>
                       <button
                         onClick={() => router.push(`/branch/${branch.id}/edit`)}
@@ -438,7 +525,7 @@ export default function BranchManagement() {
               </div>
             </div>
           ))}
-          
+
           {filteredBranches.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               <FaBuilding className="mx-auto h-12 w-12 text-gray-300 mb-4" />

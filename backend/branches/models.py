@@ -98,15 +98,16 @@ class IDType(models.TextChoices):
     CITIZENSHIP = 'citizenship', 'Citizenship'
     NATIONAL_ID = 'national_id', 'National Id'
     DRIVERS_LICENCE = 'drivers_licence', "Driver's Licence"
+    PASSPORT = 'passport', 'Passport'
 
 class BranchManager(models.Model):
     """Branch Manager relationship model"""
-    manager_id = models.CharField(max_length = 20)
+    manager_id = models.CharField(max_length=20, unique=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='managers')
     salary = models.DecimalField(max_digits=10, decimal_places=2)
     hired_date = models.DateField()
-    leaving_date = models.DateField()
+    leaving_date = models.DateField(null=True, blank=True)
     id_type = models.CharField(
         max_length=20,
         choices=IDType.choices,
@@ -119,3 +120,16 @@ class BranchManager(models.Model):
     class Meta:
         """Meta for the branch managers table"""
         db_table = 'branch_managers'
+
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate manager_id if not provided."""
+        if not self.manager_id and self.user_id:
+            # Generate manager_id based on the user's ID
+            self.manager_id = f"MGR-{self.user_id:04d}"
+            
+            # Ensure uniqueness (highly unlikely to be necessary with this scheme, but good practice)
+            while BranchManager.objects.filter(manager_id=self.manager_id).exists():
+                new_id = int(self.manager_id.split('-')[1]) + 1
+                self.manager_id = f"MGR-{new_id:04d}"
+
+        super().save(*args, **kwargs)

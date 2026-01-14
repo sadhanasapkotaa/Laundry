@@ -44,6 +44,7 @@ export default function RouteProtection({
     if (path.startsWith("/expenses")) return "expenses";
     if (path.startsWith("/clients")) return "clients";
     if (path.startsWith("/payments")) return "payments";
+    if (path.startsWith("/services")) return "services";
     if (path.startsWith("/roles")) return "roles";
     if (path.startsWith("/backup-export")) return "backup-export";
     if (path.startsWith("/delivery")) return "delivery";
@@ -102,6 +103,7 @@ export default function RouteProtection({
       "expenses": "/expenses",
       "clients": "/clients",
       "payments": "/payments",
+      "services": "/services",
       "roles": "/roles",
       "backup-export": "/backup-export",
       "delivery": "/delivery",

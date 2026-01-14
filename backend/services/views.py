@@ -44,6 +44,13 @@ class WashTypeViewSet(viewsets.ModelViewSet):
     """ViewSet for managing wash types."""
     queryset = WashType.objects.filter(is_active=True)
     serializer_class = WashTypeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        # GET is allowed for authenticated users, but create/update/delete requires admin
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
 
     def get_queryset(self):
         # For admin, show all; for others, show only active
@@ -56,6 +63,13 @@ class ClothNameViewSet(viewsets.ModelViewSet):
     """ViewSet for managing cloth names."""
     queryset = ClothName.objects.filter(is_active=True)
     serializer_class = ClothNameSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        # GET is allowed for authenticated users, but create/update/delete requires admin
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
 
     def get_queryset(self):
         if self.request.user.is_staff:
@@ -67,6 +81,13 @@ class ClothTypeViewSet(viewsets.ModelViewSet):
     """ViewSet for managing cloth types/materials."""
     queryset = ClothType.objects.filter(is_active=True)
     serializer_class = ClothTypeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        # GET is allowed for authenticated users, but create/update/delete requires admin
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
 
     def get_queryset(self):
         if self.request.user.is_staff:
@@ -78,6 +99,13 @@ class PricingRuleViewSet(viewsets.ModelViewSet):
     """ViewSet for managing pricing rules."""
     queryset = PricingRule.objects.filter(is_active=True)
     serializer_class = PricingRuleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        # GET is allowed for authenticated users, but create/update/delete requires admin
+        if self.action in ['list', 'retrieve', 'lookup']:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
 
     def get_queryset(self):
         if self.request.user.is_staff:

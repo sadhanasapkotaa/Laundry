@@ -9,12 +9,14 @@ export const PAGE_PERMISSIONS: PagePermissions = {
   // Admin has access to everything
   '/dashboard': ['admin', 'branch_manager', 'accountant'],
   '/branch': ['admin', 'branch_manager'],
+  '/branch-manager': ['admin'], // Only admin can manage branch managers
   '/orders': ['admin', 'branch_manager'],
   '/place-orders': ['admin', 'branch_manager'], // Staff can place orders for customers
   '/income': ['admin', 'accountant'],
   '/expenses': ['admin', 'accountant'],
   '/clients': ['admin', 'branch_manager'],
   '/payments': ['admin', 'branch_manager', 'accountant'],
+  '/services': ['admin'], // Only admin can manage service settings
   '/roles': ['admin'], // Only admin can manage roles
   '/backup-export': ['admin'],
   '/delivery': ['admin', 'branch_manager', 'rider'],

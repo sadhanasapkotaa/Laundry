@@ -11,7 +11,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     """Serializer for OrderItem model."""
     class Meta:
         model = OrderItem
-        fields = ['service_type', 'material', 'quantity', 'pricing_type', 'price_per_unit', 'total_price']
+        fields = ['service_type', 'wash_type', 'material', 'quantity', 'pricing_type', 'price_per_unit', 'total_price']
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -37,7 +37,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_id', 'customer_name', 'branch', 'branch_name', 'pickup_requested', 
             'order_date', 'created', 'pickup_enabled', 'delivery_enabled', 'delivery_date', 
-            'status', 'description', 'total_amount', 'is_urgent', 'payment_method', 
+            'status', 'description', 'total_amount', 'discount', 'is_urgent', 'payment_method', 
             'payment_status', 'services', 'pickup_date',
             'pickup_time', 'pickup_address', 'pickup_map_link',
             'delivery_time', 'delivery_address', 'delivery_map_link', 'delivery_contact'
@@ -133,6 +133,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     # Return fields for response
     id = serializers.UUIDField(source='order_id', read_only=True)
     order_id = serializers.UUIDField(read_only=True)
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0)
 
     class Meta:
         model = Order
@@ -140,7 +141,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             'id', 'order_id', 'branch', 'services', 'pickup_enabled', 'delivery_enabled',
             'pickup_date', 'pickup_time', 'pickup_address', 'pickup_map_link',
             'delivery_date', 'delivery_time', 'delivery_address', 'delivery_map_link',
-            'is_urgent', 'total_amount', 'payment_method', 'payment_status', 'description'
+            'is_urgent', 'total_amount', 'discount', 'payment_method', 'payment_status', 'description'
         ]
 
     def create(self, validated_data):

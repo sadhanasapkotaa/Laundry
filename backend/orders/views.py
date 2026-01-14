@@ -159,13 +159,20 @@ class OrderListView(generics.ListAPIView):
         """Return orders based on user role.
         
         Customers see only their own orders.
-        Admin and branch managers see all orders.
+        Branch managers see only their branch's orders.
+        Admins see all orders.
         """
         user = self.request.user
-        # Check if user is admin or staff
-        if user.is_staff or user.is_superuser or getattr(user, 'role', None) in ['admin', 'branch_manager']:
+        
+        # Admin sees all orders
+        if user.is_superuser or getattr(user, 'role', None) == 'admin':
             return Order.objects.all().order_by('-order_date')
-        # For regular customers, only show their orders
+        
+        # Branch manager sees only their branch's orders
+        if hasattr(user, 'branchmanager') and getattr(user, 'role', None) == 'branch_manager':
+            return Order.objects.filter(branch=user.branchmanager.branch).order_by('-order_date')
+        
+        # Customers see only their own orders
         return Order.objects.filter(customer_name=user).order_by('-order_date')
 
 class OrderDetailView(generics.RetrieveAPIView):
@@ -177,8 +184,16 @@ class OrderDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         """Return orders based on user role."""
         user = self.request.user
-        if user.is_staff or user.is_superuser or getattr(user, 'role', None) in ['admin', 'branch_manager']:
+        
+        # Admin sees all orders
+        if user.is_superuser or getattr(user, 'role', None) == 'admin':
             return Order.objects.all()
+        
+        # Branch manager sees only their branch's orders
+        if hasattr(user, 'branchmanager') and getattr(user, 'role', None) == 'branch_manager':
+            return Order.objects.filter(branch=user.branchmanager.branch)
+        
+        # Customers see only their own orders
         return Order.objects.filter(customer_name=user)
 
 class OrderUpdateView(generics.UpdateAPIView):
@@ -190,8 +205,16 @@ class OrderUpdateView(generics.UpdateAPIView):
     def get_queryset(self):
         """Return orders based on user role."""
         user = self.request.user
-        if user.is_staff or user.is_superuser or getattr(user, 'role', None) in ['admin', 'branch_manager']:
+        
+        # Admin sees all orders
+        if user.is_superuser or getattr(user, 'role', None) == 'admin':
             return Order.objects.all()
+        
+        # Branch manager sees only their branch's orders
+        if hasattr(user, 'branchmanager') and getattr(user, 'role', None) == 'branch_manager':
+            return Order.objects.filter(branch=user.branchmanager.branch)
+        
+        # Customers see only their own orders
         return Order.objects.filter(customer_name=user)
 
 class OrderDeleteView(generics.DestroyAPIView):
@@ -203,8 +226,16 @@ class OrderDeleteView(generics.DestroyAPIView):
     def get_queryset(self):
         """Return orders based on user role."""
         user = self.request.user
-        if user.is_staff or user.is_superuser or getattr(user, 'role', None) in ['admin', 'branch_manager']:
+        
+        # Admin sees all orders
+        if user.is_superuser or getattr(user, 'role', None) == 'admin':
             return Order.objects.all()
+        
+        # Branch manager sees only their branch's orders
+        if hasattr(user, 'branchmanager') and getattr(user, 'role', None) == 'branch_manager':
+            return Order.objects.filter(branch=user.branchmanager.branch)
+        
+        # Customers see only their own orders
         return Order.objects.filter(customer_name=user)
 
 
@@ -221,94 +252,130 @@ class OrderStatsView(generics.GenericAPIView):
         
         user = request.user
         
-        # Get orders for this user (customers only see their own)
-        if user.is_staff or user.is_superuser or getattr(user, 'role', None) in ['admin', 'branch_manager']:
+        # Get orders based on user role
+        if user.is_superuser or getattr(user, 'role', None) == 'admin':
+            # Admin sees all orders
             orders = Order.objects.all()
+        elif hasattr(user, 'branchmanager') and getattr(user, 'role', None) == 'branch_manager':
+            # Branch manager sees only their branch's orders
+            orders = Order.objects.filter(branch=user.branchmanager.branch)
         else:
+            # Customers see only their own orders
             orders = Order.objects.filter(customer_name=user)
         
-        # Calculate statistics - include partially paid orders in pending calculations
-        pending_payment_orders = orders.filter(Q(payment_status='pending') | Q(payment_status='partially_paid'))
+        # Get time range from request
+        time_range = request.query_params.get('range', '7d')
         
-        stats = orders.aggregate(
-            total_orders=Count('order_id'),
-            active_orders=Count('order_id', filter=Q(status__in=[
-                'pending pickup', 'picked up', 'sent to wash', 'in wash', 
-                'washed', 'picked by client', 'pending delivery', 'dropped by user'
-            ])),
-            completed_orders=Count('order_id', filter=Q(status='completed') | Q(status='delivered')),
-            pending_payments_count=Count('order_id', filter=Q(payment_status='pending') | Q(payment_status='partially_paid')),
-        )
+        from django.utils import timezone
+        import datetime
+        from django.db.models.functions import TruncDay, TruncMonth
         
-        # Calculate pending amount considering partial payments
-        total_pending = 0
-        for order in pending_payment_orders:
-            # Get total amount already paid for this order
-            paid_amount = OrderPayment.objects.filter(order=order).aggregate(
-                total=Sum('amount_applied')
-            )['total'] or 0
-            
-            # Add remaining amount to total pending
-            remaining = order.total_amount - paid_amount
-            if remaining > 0:
-                total_pending += remaining
+        now = timezone.now()
+        start_date = now - datetime.timedelta(days=7) # Default 7d
+        trunc_func = TruncDay('order_date')
+        date_format = '%A' # Day name
         
-        stats['pending_amount'] = float(total_pending)
-        
-        # Get pending orders list with basic info (convert UUID to string)
-        pending_orders_qs = pending_payment_orders.values(
-            'order_id', 'total_amount', 'status', 'order_date', 'payment_status'
-        )[:10]  # Limit to 10 for performance
-        
-        pending_orders = []
-        for order_data in pending_orders_qs:
-            order_id = order_data['order_id']
-            # Calculate amount already paid
-            paid_amount = OrderPayment.objects.filter(order_id=order_id).aggregate(
-                total=Sum('amount_applied')
-            )['total'] or 0
-            
-            pending_orders.append({
-                'id': str(order_id),
-                'order_id': str(order_id),
-                'total_amount': float(order_data['total_amount']) if order_data['total_amount'] else 0,
-                'paid_amount': float(paid_amount),
-                'pending_amount': float(order_data['total_amount'] - paid_amount) if order_data['total_amount'] else 0,
-                'status': order_data['status'],
-                'payment_status': order_data['payment_status'],
-                'order_date': str(order_data['order_date']) if order_data['order_date'] else None,
-            })
+        if time_range == '1m':
+            start_date = now - datetime.timedelta(days=30)
+            trunc_func = TruncDay('order_date')
+            date_format = '%d %b' # 12 Jan
+        elif time_range == '1y':
+            start_date = now - datetime.timedelta(days=365)
+            trunc_func = TruncMonth('order_date')
+            date_format = '%B' # Month name
 
-        # Calculate pending amount per branch (considering partial payments)
-        branch_pending = {}
-        for order in pending_payment_orders.select_related('branch'):
-            # Get amount already paid for this order
-            paid_amount = OrderPayment.objects.filter(order=order).aggregate(
-                total=Sum('amount_applied')
-            )['total'] or 0
+        # Filter orders by date range
+        range_orders = orders.filter(order_date__gte=start_date)
+
+        # 1. Chart Data (Orders & Income over time)
+        chart_data_raw = range_orders.annotate(
+            period=trunc_func
+        ).values('period').annotate(
+            orders=Count('order_id'),
+            income=Sum('total_amount', filter=Q(payment_status='paid')),
+        ).order_by('period')
+
+        chart_data = []
+        for entry in chart_data_raw:
+            if entry['period']:
+                chart_data.append({
+                    'label': entry['period'].strftime(date_format),
+                    'date': entry['period'].strftime('%Y-%m-%d'),
+                    'orders': entry['orders'],
+                    'income': float(entry['income'] or 0)
+                })
+
+        # 2. Service Distribution (Top 5)
+        # Using OrderItem to count service usage
+        from .models import OrderItem
+        service_dist_raw = OrderItem.objects.filter(
+            order__in=range_orders
+        ).values('service_type').annotate(
+            value=Count('id')
+        ).order_by('-value')[:5]
+
+        service_distribution = [
+            {'name': item['service_type'], 'value': item['value']}
+            for item in service_dist_raw
+        ]
+
+        # 3. Branch Performance
+        branch_perf_raw = range_orders.values(
+            'branch__name'
+        ).annotate(
+            orders=Count('order_id'),
+            income=Sum('total_amount', filter=Q(payment_status='paid'))
+        ).order_by('-income')[:5]
+
+        branch_performance = [
+            {
+                'branch': item['branch__name'], 
+                'orders': item['orders'], 
+                'income': float(item['income'] or 0)
+            }
+            for item in branch_perf_raw
+        ]
+
+        # 4. Recent Activity (Latest 5 items from Orders, Deliveries, Payments)
+        # For simplicity, we'll just show recent Orders and their status changes
+        recent_activity_orders = orders.order_by('-order_date')[:5]
+        recent_activity = []
+        for o in recent_activity_orders:
+            recent_activity.append({
+                'action': f"Order #{str(o.order_id)[:8]} {o.status}",
+                'time': o.order_date, # Serializer will format this or we do it here
+                'type': 'order'
+            })
             
-            remaining = order.total_amount - paid_amount
-            if remaining > 0:
-                branch_id = order.branch.id
-                if branch_id not in branch_pending:
-                    branch_pending[branch_id] = {
-                        'branch_id': branch_id,
-                        'branch_name': order.branch.name,
-                        'total_pending': 0
-                    }
-                branch_pending[branch_id]['total_pending'] += remaining
-        
-        # Convert to list and sort by branch name
-        filtered_branch_amounts = sorted(
-            branch_pending.values(),
-            key=lambda x: x['branch_name']
+        # Stats Cards (Totals for the selected range)
+        range_stats = range_orders.aggregate(
+            total_orders=Count('order_id'),
+            total_income=Sum('total_amount', filter=Q(payment_status='paid')),
         )
         
+        # ACTVE ORDERS: Should be a snapshot of CURRENT active orders, not filtered by date range
+        # Also added 'dropped by user' to active statuses
+        active_orders_count = orders.filter(
+            status__in=[
+                'dropped by user', 'pending pickup', 'picked up', 'sent to wash', 'in wash', 
+                'washed', 'picked by client', 'pending delivery', 'pending', 'in progress'
+            ]
+        ).count()
+
         return Response({
             'success': True,
-            'stats': stats,
-            'pending_orders': pending_orders,
-            'branch_pending_amounts': filtered_branch_amounts,
+            'time_range': time_range,
+            'stats': {
+                'total_orders': range_stats['total_orders'] or 0,
+                'total_income': float(range_stats['total_income'] or 0),
+                'active_orders': active_orders_count,
+            },
+            'chart_data': chart_data,
+            'service_distribution': service_distribution,
+            'branch_performance': branch_performance,
+            'recent_activity': recent_activity, # Need frontend to format time
+            # Keep legacy support for pending amounts block if needed, or remove if dashboard doesn't use it
+             # 'pending_orders': ... (omitted for dashboard performance, use separate endpoint if needed)
         })
 
 

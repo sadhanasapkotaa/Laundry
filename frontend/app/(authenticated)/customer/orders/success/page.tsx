@@ -8,102 +8,17 @@ import { apiRequest, API_CONFIG } from "../../../../config/api";
 export default function OrderPaymentSuccessPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [retryCount, setRetryCount] = useState(0);
-    const MAX_RETRIES = 3;
-
     const [isLoading, setIsLoading] = useState(true);
     const [paymentData, setPaymentData] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        let isMounted = true;
-
-        const fetchPaymentReceipt = async (attempt = 0) => {
+        const fetchPaymentReceipt = async () => {
             try {
                 const transactionUuid = searchParams.get('transaction_uuid');
-                const dataParam = searchParams.get('data');
-
-                // Case 1: Handle eSewa direct return with data parameter
-                if (dataParam) {
-                    try {
-                        const decoded = atob(dataParam);
-                        const paymentData = JSON.parse(decoded);
-                        console.log('Decoded eSewa data:', paymentData);
-
-                        const { transaction_uuid, total_amount, transaction_code } = paymentData;
-
-                        if (!transaction_uuid || !total_amount) {
-                            throw new Error('Invalid payment data');
-                        }
-
-                        // Verify eSewa payment
-                        const response = await apiRequest(API_CONFIG.ENDPOINTS.PAYMENTS.VERIFY_ESEWA, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                transaction_uuid,
-                                amount: total_amount,
-                                transaction_code
-                            }),
-                        });
-
-                        // Handle 503 specifically
-                        if (response.status === 503 && attempt < MAX_RETRIES) {
-                            console.log(`Verification returned 503, retrying (attempt ${attempt + 1}/${MAX_RETRIES})...`);
-                            setTimeout(() => {
-                                if (isMounted) fetchPaymentReceipt(attempt + 1);
-                            }, 2000);
-                            return;
-                        }
-
-                        const result = await response.json();
-
-                        if (result.success) {
-                            // If verification returns a full receipt (it should), use it
-                            if (result.payment) {
-                                if (isMounted) {
-                                    setPaymentData(result.payment);
-                                    setIsLoading(false);
-                                }
-                            } else {
-                                // Fallback to fetching receipt if verify only returned success
-                                const receiptResponse = await apiRequest(`/payments/process/${transaction_uuid}/`, {
-                                    method: 'POST',
-                                });
-                                const receiptResult = await receiptResponse.json();
-                                if (receiptResult.success) {
-                                    if (isMounted) {
-                                        setPaymentData(receiptResult.payment);
-                                        setIsLoading(false);
-                                    }
-                                } else {
-                                    if (isMounted) {
-                                        setError(receiptResult.error || 'Failed to fetch payment details');
-                                        setIsLoading(false);
-                                    }
-                                }
-                            }
-                        } else {
-                            if (isMounted) {
-                                setError(result.error || 'Payment verification failed');
-                                setIsLoading(false);
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Error processing eSewa data:', e);
-                        if (isMounted) {
-                            setError('Invalid payment data received from payment gateway');
-                            setIsLoading(false);
-                        }
-                    }
-                    return;
-                }
-
-                // Case 2: Handle existing flow with transaction_uuid
                 if (!transactionUuid) {
-                    if (isMounted) {
-                        setError('No transaction ID found in URL. Please check if you were redirected properly from the payment gateway.');
-                        setIsLoading(false);
-                    }
+                    setError('No transaction ID found in URL. Please check if you were redirected properly from the payment gateway.');
+                    setIsLoading(false);
                     return;
                 }
 
@@ -112,48 +27,23 @@ export default function OrderPaymentSuccessPage() {
                     method: 'POST',
                 });
 
-                if (response.status === 503 && attempt < MAX_RETRIES) {
-                    console.log(`Receipt fetch returned 503, retrying (attempt ${attempt + 1}/${MAX_RETRIES})...`);
-                    setTimeout(() => {
-                        if (isMounted) fetchPaymentReceipt(attempt + 1);
-                    }, 2000);
-                    return;
-                }
-
                 const result = await response.json();
 
                 if (result.success) {
-                    if (isMounted) {
-                        setPaymentData(result.payment);
-                        setIsLoading(false);
-                    }
+                    setPaymentData(result.payment);
                 } else {
-                    if (isMounted) {
-                        setError(result.error || 'Failed to fetch payment details. Please try refreshing the page or contact support.');
-                        setIsLoading(false);
-                    }
+                    setError(result.error || 'Failed to fetch payment details. Please try refreshing the page or contact support.');
                 }
             } catch (err) {
                 console.error('Error fetching payment receipt:', err);
-                if (isMounted) {
-                    setError('Failed to load payment details. Please try refreshing the page or contact support.');
-                    setIsLoading(false);
-                }
+                setError('Failed to load payment details. Please try refreshing the page or contact support.');
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        fetchPaymentReceipt(0);
-
-        return () => {
-            isMounted = false;
-        };
+        fetchPaymentReceipt();
     }, [searchParams]);
-
-    // Update isLoading handling to properly reflect retry state if needed, 
-    // but the recursive calls are detached.
-    // Let's refine the isLoading logic inside the function.
-    // I will replace the function body entirely.
-
 
     if (isLoading) {
         return (

@@ -7,6 +7,10 @@ import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt, FaPlus, FaSav
 import { branchAPI, Branch } from "../../../services/branchService";
 import { addressAPI, UserAddress } from "../../../services/addressService";
 import { useAuth } from "../../../contexts/AuthContext";
+import {
+  washTypeAPI, clothNameAPI, clothTypeAPI, pricingRuleAPI,
+  WashType, ClothName, ClothType, PricingRule
+} from "../../../services/settingsService";
 
 // Dynamically import the MapAddressSelector to avoid SSR issues
 const MapAddressSelector = dynamic(
@@ -14,23 +18,13 @@ const MapAddressSelector = dynamic(
   { ssr: false }
 );
 
-// Price table for cloth type + material
-const prices: Record<string, Record<string, number>> = {
-  saree: { siphon: 200, net: 250 },
-  shirt: { cotton: 100, silk: 150 },
-  pant: { cotton: 120, wool: 180 },
-  coat: { wool: 300, leather: 500 },
-  blouse: { cotton: 80, silk: 120 },
-  blanket: { cotton: 400, wool: 500 },
-  jacket: { down: 600, leather: 700 },
-};
-
-const clothNames = Object.keys(prices);
-const clothMaterials = (cloth: string) => Object.keys(prices[cloth] || {});
-
 interface CartItem {
   id: string;
+  washTypeId: number;
+  washTypeName: string;
+  clothNameId: number;
   clothName: string;
+  clothTypeId: number;
   material: string;
   quantity: number;
   clothType: "individual" | "bulk";
@@ -54,14 +48,24 @@ export default function CustomerPlaceOrderPage() {
   const [branchesLoading, setBranchesLoading] = useState(true);
   const [selectedBranch, setSelectedBranch] = useState<number | null>(null);
 
+  // Services data from API
+  const [washTypes, setWashTypes] = useState<WashType[]>([]);
+  const [clothNames, setClothNames] = useState<ClothName[]>([]);
+  const [clothTypes, setClothTypes] = useState<ClothType[]>([]);
+  const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
 
   // Current item being added
-  const [clothName, setClothName] = useState("");
-  const [material, setMaterial] = useState("");
+  const [selectedWashType, setSelectedWashType] = useState<number | null>(null);
+  const [selectedClothName, setSelectedClothName] = useState<number | null>(null);
+  const [selectedClothType, setSelectedClothType] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [clothType, setClothType] = useState<"individual" | "bulk">("individual");
+  const [clothTypeMode, setClothTypeMode] = useState<"individual" | "bulk">("individual");
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [priceLoading, setPriceLoading] = useState(false);
 
   // Service options
   const [pickupEnabled, setPickupEnabled] = useState(false);
@@ -91,6 +95,28 @@ export default function CustomerPlaceOrderPage() {
   const [saveDeliveryAddress, setSaveDeliveryAddress] = useState(false);
 
   const [errors, setErrors] = useState<string[]>([]);
+
+  // Fetch services data (wash types, cloth names, cloth types, pricing rules)
+  const fetchServicesData = useCallback(async () => {
+    try {
+      setServicesLoading(true);
+      const [washData, clothNameData, clothTypeData, pricingData] = await Promise.all([
+        washTypeAPI.list(),
+        clothNameAPI.list(),
+        clothTypeAPI.list(),
+        pricingRuleAPI.list()
+      ]);
+      setWashTypes(washData);
+      setClothNames(clothNameData);
+      setClothTypes(clothTypeData);
+      setPricingRules(pricingData);
+    } catch (error) {
+      console.error('Error fetching services data:', error);
+      setErrors(prev => [...prev, 'Failed to load service options']);
+    } finally {
+      setServicesLoading(false);
+    }
+  }, []);
 
   // Fetch saved addresses
   const fetchAddresses = useCallback(async () => {
@@ -148,7 +174,41 @@ export default function CustomerPlaceOrderPage() {
   useEffect(() => {
     fetchBranches();
     fetchAddresses();
-  }, [fetchBranches, fetchAddresses]);
+    fetchServicesData();
+  }, [fetchBranches, fetchAddresses, fetchServicesData]);
+
+  // Lookup price when wash type, cloth name, or cloth type changes
+  useEffect(() => {
+    const lookupPrice = async () => {
+      if (selectedWashType && selectedClothName && selectedClothType) {
+        setPriceLoading(true);
+        try {
+          // First try to find in cached pricing rules
+          const cachedRule = pricingRules.find(
+            r => r.wash_type === selectedWashType && 
+                 r.cloth_name === selectedClothName && 
+                 r.cloth_type === selectedClothType &&
+                 r.is_active
+          );
+          if (cachedRule) {
+            setCurrentPrice(parseFloat(cachedRule.price));
+          } else {
+            // Fallback to API lookup
+            const result = await pricingRuleAPI.lookup(selectedWashType, selectedClothName, selectedClothType);
+            setCurrentPrice(result.price ? parseFloat(result.price) : null);
+          }
+        } catch (error) {
+          console.error('Error looking up price:', error);
+          setCurrentPrice(null);
+        } finally {
+          setPriceLoading(false);
+        }
+      } else {
+        setCurrentPrice(null);
+      }
+    };
+    lookupPrice();
+  }, [selectedWashType, selectedClothName, selectedClothType, pricingRules]);
 
   // Get pickup addresses (type 'pickup' or 'both')
   const pickupAddresses = savedAddresses.filter(
@@ -217,33 +277,49 @@ export default function CustomerPlaceOrderPage() {
 
 
   const getPrice = () => {
-    if (!clothName || !material) return 0;
-    return (prices[clothName]?.[material] || 0) * quantity;
+    if (!currentPrice) return 0;
+    return currentPrice * quantity;
   };
 
   const addToCart = () => {
-    if (!clothName || !material || quantity <= 0 || !selectedBranch) {
+    if (!selectedWashType || !selectedClothName || !selectedClothType || quantity <= 0 || !selectedBranch) {
       setErrors(['Please fill in all fields including branch selection']);
       return;
     }
 
-    const unitPrice = prices[clothName]?.[material] || 0;
+    if (!currentPrice) {
+      setErrors(['No pricing rule found for this combination. Please contact support.']);
+      return;
+    }
+
+    const unitPrice = currentPrice;
     const totalPrice = unitPrice * quantity;
+
+    // Get the names for display
+    const washType = washTypes.find(w => w.id === selectedWashType);
+    const clothName = clothNames.find(c => c.id === selectedClothName);
+    const clothType = clothTypes.find(t => t.id === selectedClothType);
 
     const item: CartItem = {
       id: Date.now().toString(),
-      clothName,
-      material,
+      washTypeId: selectedWashType,
+      washTypeName: washType?.name || '',
+      clothNameId: selectedClothName,
+      clothName: clothName?.name || '',
+      clothTypeId: selectedClothType,
+      material: clothType?.name || '',
       quantity,
-      clothType,
+      clothType: clothTypeMode,
       price: totalPrice,
       unitPrice
     };
 
     setCart([...cart, item]);
-    setClothName("");
-    setMaterial("");
+    setSelectedWashType(null);
+    setSelectedClothName(null);
+    setSelectedClothType(null);
     setQuantity(1);
+    setCurrentPrice(null);
     setErrors([]);
   };
 
@@ -475,103 +551,131 @@ export default function CustomerPlaceOrderPage() {
               <h2 className="text-lg font-bold">Add Items</h2>
             </div>
 
-            {/* Type Toggles */}
-            <div className="grid grid-cols-2 gap-3 mb-6 p-1 bg-gray-100 dark:bg-gray-700/50 rounded-xl">
-              <button
-                onClick={() => setClothType("individual")}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${clothType === "individual"
-                  ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
-                  }`}
-              >
-                <FaTshirt /> Individual
-              </button>
-              <button
-                onClick={() => setClothType("bulk")}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${clothType === "bulk"
-                  ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
-                  }`}
-              >
-                <FaBox /> Bulk (Kg)
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Item Type</label>
-                <select
-                  className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
-                  value={clothName}
-                  onChange={(e) => setClothName(e.target.value)}
-                >
-                  <option value="">Select type...</option>
-                  {clothNames.map((c) => (
-                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                  ))}
-                </select>
+            {servicesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mr-2"></div>
+                <span className="text-gray-500">Loading service options...</span>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Material</label>
-                <select
-                  className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500/20 transition-all disabled:opacity-50"
-                  value={material}
-                  onChange={(e) => setMaterial(e.target.value)}
-                  disabled={!clothName}
-                >
-                  <option value="">Select material...</option>
-                  {clothName &&
-                    clothMaterials(clothName).map((m) => (
-                      <option key={m} value={m}>
-                        {m.charAt(0).toUpperCase() + m.slice(1)} - ₨ {prices[clothName][m]} / {clothType === "individual" ? "pc" : "kg"}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Quantity</label>
-                <div className="flex items-center border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+            ) : (
+              <>
+                {/* Type Toggles */}
+                <div className="grid grid-cols-2 gap-3 mb-6 p-1 bg-gray-100 dark:bg-gray-700/50 rounded-xl">
                   <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-r border-gray-200 dark:border-gray-600"
+                    onClick={() => setClothTypeMode("individual")}
+                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${clothTypeMode === "individual"
+                      ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                      }`}
                   >
-                    <FaMinus className="text-gray-500" size={12} />
+                    <FaTshirt /> Individual
                   </button>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-full bg-transparent text-center outline-none px-2 text-gray-900 dark:text-gray-100 font-semibold"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  />
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-l border-gray-200 dark:border-gray-600"
+                    onClick={() => setClothTypeMode("bulk")}
+                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${clothTypeMode === "bulk"
+                      ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                      }`}
                   >
-                    <FaPlus className="text-gray-500" size={12} />
+                    <FaBox /> Bulk (Kg)
                   </button>
                 </div>
-              </div>
 
-              <div className="flex-1 w-full sm:w-auto">
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Est. Price</label>
-                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-xl px-4 py-3 font-mono font-bold text-gray-900 dark:text-gray-100 text-center">
-                  ₨ {getPrice().toLocaleString()}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  {/* Wash Type Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Wash Type</label>
+                    <select
+                      className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
+                      value={selectedWashType || ""}
+                      onChange={(e) => setSelectedWashType(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">Select wash type...</option>
+                      {washTypes.map((w) => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cloth Name Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Item Type</label>
+                    <select
+                      className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
+                      value={selectedClothName || ""}
+                      onChange={(e) => setSelectedClothName(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">Select item...</option>
+                      {clothNames.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cloth Type (Material) Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Material</label>
+                    <select
+                      className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
+                      value={selectedClothType || ""}
+                      onChange={(e) => setSelectedClothType(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">Select material...</option>
+                      {clothTypes.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              <button
-                onClick={addToCart}
-                disabled={!clothName || !material || quantity <= 0}
-                className="w-full sm:w-auto px-6 py-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-nowrap"
-              >
-                Add to Cart
-              </button>
-            </div>
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Quantity</label>
+                    <div className="flex items-center border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-r border-gray-200 dark:border-gray-600"
+                      >
+                        <FaMinus className="text-gray-500" size={12} />
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        className="w-full bg-transparent text-center outline-none px-2 text-gray-900 dark:text-gray-100 font-semibold"
+                        value={quantity}
+                        onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                      />
+                      <button
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-l border-gray-200 dark:border-gray-600"
+                      >
+                        <FaPlus className="text-gray-500" size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 w-full sm:w-auto">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Est. Price</label>
+                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-xl px-4 py-3 font-mono font-bold text-gray-900 dark:text-gray-100 text-center">
+                      {priceLoading ? (
+                        <span className="text-gray-400">Loading...</span>
+                      ) : currentPrice === null && selectedWashType && selectedClothName && selectedClothType ? (
+                        <span className="text-red-500 text-sm">No price set</span>
+                      ) : (
+                        `₨ ${getPrice().toLocaleString()}`
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={addToCart}
+                    disabled={!selectedWashType || !selectedClothName || !selectedClothType || quantity <= 0 || !currentPrice}
+                    className="w-full sm:w-auto px-6 py-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-nowrap"
+                  >
+                    Add to Cart
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Service Options */}
@@ -806,7 +910,9 @@ export default function CustomerPlaceOrderPage() {
                     <div key={item.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl flex justify-between items-start group">
                       <div>
                         <h4 className="font-bold text-gray-900 dark:text-gray-100">{item.clothName}</h4>
-                        <p className="text-xs text-gray-500 capitalize">{item.material} • {item.clothType}</p>
+                        <p className="text-xs text-gray-500 capitalize">
+                          {item.washTypeName} • {item.material} • {item.clothType}
+                        </p>
                         <div className="flex items-center gap-3 mt-2">
                           <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-600 shadow-sm">
                             <button

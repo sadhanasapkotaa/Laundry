@@ -3,43 +3,20 @@
 import "../../../../types/i18n";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { FaUser, FaBuilding, FaMoneyBillWave, FaCalendar, FaArrowLeft } from "react-icons/fa";
+import { FaUser, FaBuilding, FaCalendar, FaArrowLeft } from "react-icons/fa";
+import { branchManagerAPI, BranchManagerUpdateData } from "../../../../services/branchManagerService";
+import { Branch } from "../../../../services/branchService";
+import { branchAPI } from "../../../../services/branchService";
 
-interface Branch {
-  id: string;
-  name: string;
-  address: string;
-  status: string;
-}
-
-interface BranchManager {
-  id: string;
-  manager_id: string;
-  user_email: string;
-  user_name: string;
-  first_name: string;
-  last_name: string;
-  phone?: string;
-  branch_id: string;
-  branch_name: string;
-  salary: number;
-  hired_date: string;
-  leaving_date?: string;
-  id_type: string;
-  citizenship_number: string;
-  is_active: boolean;
-}
 
 interface FormData {
   first_name: string;
   last_name: string;
-  email: string;
-  phone: string;
-  branch_id: string;
+  branch: number;
   salary: string;
   hired_date: string;
   leaving_date: string;
-  id_type: string;
+  id_type: 'citizenship' | 'national_id' | 'drivers_licence' | 'passport';
   citizenship_number: string;
   is_active: boolean;
 }
@@ -47,9 +24,7 @@ interface FormData {
 interface FormErrors {
   first_name?: string;
   last_name?: string;
-  email?: string;
-  phone?: string;
-  branch_id?: string;
+  branch?: string;
   salary?: string;
   hired_date?: string;
   id_type?: string;
@@ -64,12 +39,13 @@ export default function EditBranchManager() {
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [managerEmail, setManagerEmail] = useState(""); // To display non-editable email
+  const [managerPhone, setManagerPhone] = useState(""); // To display non-editable phone
   const [formData, setFormData] = useState<FormData>({
     first_name: "",
     last_name: "",
-    email: "",
-    phone: "",
-    branch_id: "",
+    branch: 0,
     salary: "",
     hired_date: "",
     leaving_date: "",
@@ -77,67 +53,49 @@ export default function EditBranchManager() {
     citizenship_number: "",
     is_active: true,
   });
-  const [errors, setErrors] = useState<FormErrors>({});
-
-  // Mock branches data
-  const mockBranches: Branch[] = [
-    { id: "1", name: "Main Branch", address: "Kathmandu, Nepal", status: "active" },
-    { id: "2", name: "Downtown Branch", address: "Pokhara, Nepal", status: "active" },
-    { id: "3", name: "Pokhara Branch", address: "Pokhara, Nepal", status: "active" },
-  ];
-
-  // Mock manager data
-  const mockManager: BranchManager = {
-    id: "1",
-    manager_id: "MGR-001",
-    user_email: "john.manager@laundrypro.com",
-    user_name: "John Manager",
-    first_name: "John",
-    last_name: "Manager",
-    phone: "+977-9841234567",
-    branch_id: "1",
-    branch_name: "Main Branch",
-    salary: 75000,
-    hired_date: "2023-01-15",
-    leaving_date: "",
-    id_type: "citizenship",
-    citizenship_number: "123456789",
-    is_active: true,
-  };
 
   useEffect(() => {
-    // Simulate API calls
-    setTimeout(() => {
-      setBranches(mockBranches);
-      
-      // Pre-populate form with existing manager data
-      setFormData({
-        first_name: mockManager.first_name,
-        last_name: mockManager.last_name,
-        email: mockManager.user_email,
-        phone: mockManager.phone || "",
-        branch_id: mockManager.branch_id,
-        salary: mockManager.salary.toString(),
-        hired_date: mockManager.hired_date,
-        leaving_date: mockManager.leaving_date || "",
-        id_type: mockManager.id_type,
-        citizenship_number: mockManager.citizenship_number,
-        is_active: mockManager.is_active,
-      });
-      
-      setDataLoading(false);
-    }, 1000);
+    if (!managerId) return;
+
+    const fetchData = async () => {
+      try {
+        setDataLoading(true);
+        // Fetch manager details and active branches concurrently
+        const [managerData, branchesData] = await Promise.all([
+          branchManagerAPI.detail(managerId),
+          branchAPI.list({ status: 'active' })
+        ]);
+
+        setBranches(branchesData);
+        setManagerEmail(managerData.user_email); // Store non-editable email
+        setManagerPhone(managerData.user_phone || ""); // Store non-editable phone
+        
+        // Pre-populate form with existing manager data
+        setFormData({
+          first_name: managerData.user_first_name || "",
+          last_name: managerData.user_last_name || "",
+          branch: managerData.branch,
+          salary: managerData.salary.toString(),
+          hired_date: managerData.hired_date,
+          leaving_date: managerData.leaving_date || "",
+          id_type: managerData.id_type,
+          citizenship_number: managerData.citizenship_number?.toString() || "",
+          is_active: managerData.is_active,
+        });
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        alert("Failed to load manager or branch data. Please try again.");
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    fetchData();
   }, [managerId]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
-    }
 
     // Name validation
     if (!formData.first_name.trim()) {
@@ -148,16 +106,9 @@ export default function EditBranchManager() {
       newErrors.last_name = "Last name is required";
     }
 
-    // Phone validation
-    if (!formData.phone) {
-      newErrors.phone = "Phone number is required";
-    } else if (!/^\+?[\d\s-()]+$/.test(formData.phone)) {
-      newErrors.phone = "Invalid phone number format";
-    }
-
     // Branch validation
-    if (!formData.branch_id) {
-      newErrors.branch_id = "Branch selection is required";
+    if (!formData.branch) {
+      newErrors.branch = "Branch selection is required";
     }
 
     // Salary validation
@@ -188,9 +139,13 @@ export default function EditBranchManager() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     
+    const newValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked :
+                     name === 'branch' ? parseInt(value, 10) || 0 :
+                     value;
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]: newValue
     }));
 
     // Clear error when user starts typing
@@ -211,11 +166,21 @@ export default function EditBranchManager() {
 
     setLoading(true);
 
+    const updateData: BranchManagerUpdateData = {
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      branch: formData.branch,
+      salary: parseFloat(formData.salary),
+      hired_date: formData.hired_date,
+      leaving_date: formData.leaving_date || undefined,
+      id_type: formData.id_type,
+      citizenship_number: formData.citizenship_number,
+      is_active: formData.is_active,
+    };
+
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await branchManagerAPI.update(managerId, updateData);
       
-      console.log("Updating branch manager:", formData);
       alert("Branch manager updated successfully!");
       router.push(`/branch-manager/${managerId}`);
     } catch (error) {
@@ -296,42 +261,30 @@ export default function EditBranchManager() {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2">
-                Email Address *
+                Email Address (Read-only)
               </label>
               <input
                 type="email"
                 id="email"
                 name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.email ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="Enter email address"
+                value={managerEmail}
+                readOnly
+                className="w-full px-3 py-2 border rounded-md bg-gray-100 cursor-not-allowed"
               />
-              {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-              )}
             </div>
 
             <div>
               <label htmlFor="phone" className="block text-sm font-medium mb-2">
-                Phone Number *
+                Phone Number (Read-only)
               </label>
               <input
                 type="tel"
                 id="phone"
                 name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.phone ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="Enter phone number"
+                value={managerPhone}
+                readOnly
+                className="w-full px-3 py-2 border rounded-md bg-gray-100 cursor-not-allowed"
               />
-              {errors.phone && (
-                <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
-              )}
             </div>
           </div>
         </div>
@@ -344,27 +297,27 @@ export default function EditBranchManager() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="branch_id" className="block text-sm font-medium mb-2">
+              <label htmlFor="branch" className="block text-sm font-medium mb-2">
                 Assign Branch *
               </label>
               <select
-                id="branch_id"
-                name="branch_id"
-                value={formData.branch_id}
+                id="branch"
+                name="branch"
+                value={formData.branch}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.branch_id ? "border-red-500" : "border-gray-300"
+                  errors.branch ? "border-red-500" : "border-gray-300"
                 }`}
               >
                 <option value="">Select a branch</option>
-                {branches.filter(branch => branch.status === 'active').map((branch) => (
+                {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
                     {branch.name} - {branch.address}
                   </option>
                 ))}
               </select>
-              {errors.branch_id && (
-                <p className="text-red-500 text-sm mt-1">{errors.branch_id}</p>
+              {errors.branch && (
+                <p className="text-red-500 text-sm mt-1">{errors.branch}</p>
               )}
             </div>
 

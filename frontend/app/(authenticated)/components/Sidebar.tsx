@@ -24,6 +24,7 @@ import {
   FaChevronLeft,   // Collapse
   FaChevronRight,  // Expand
   FaUser,          // Profile
+  FaCog,           // Services/Settings
 } from "react-icons/fa";
 
 interface SidebarProps {
@@ -102,6 +103,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       label: t("navigation.payments") || "Payment Management",
       path: "/payments",
       roles: ["admin", "branch_manager", "accountant"], // Admin, Branch Managers, and Accountants can manage payments
+    },
+    {
+      id: "services",
+      icon: FaCog,
+      label: "Services",
+      path: "/services",
+      roles: ["admin"], // Only admin can manage service settings
     },
     {
       id: "roles",

@@ -8,7 +8,7 @@ export interface Subscription {
   end_date: string;
   is_active: boolean;
   payment_amount?: number;
-  transaction_uuid: string;
+  transaction_uuid?: string;
   // Define specific properties instead of using any
 }
 

@@ -3,7 +3,7 @@
 import "../../../types/i18n";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FaUser, FaBuilding, FaMoneyBillWave, FaCalendar, FaArrowLeft, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaUser, FaBuilding, FaCalendar, FaArrowLeft, FaEye, FaEyeSlash } from "react-icons/fa";
 import { branchManagerAPI, BranchManagerFormData } from "../../../services/branchManagerService";
 import { branchAPI, Branch } from "../../../services/branchService";
 

@@ -40,34 +40,27 @@ const BranchDetail = () => {
   const router = useRouter();
   const params = useParams();
   const branchId = params.id as string;
-  
+
   const [branch, setBranch] = useState<Branch | null>(null);
   const [loading, setLoading] = useState(true);
   const [user] = useState<User>({ role: 'admin' });
 
-  // Mock monthly data for charts
-  const monthlyData = [
-    { month: 'Jan', revenue: 120000, expenses: 80000, orders: 150 },
-    { month: 'Feb', revenue: 135000, expenses: 85000, orders: 165 },
-    { month: 'Mar', revenue: 125000, expenses: 82000, orders: 155 },
-    { month: 'Apr', revenue: 145000, expenses: 90000, orders: 180 },
-    { month: 'May', revenue: 155000, expenses: 95000, orders: 195 },
-    { month: 'Jun', revenue: 160000, expenses: 98000, orders: 200 },
-  ];
-
-  const expenseBreakdown = [
-    { name: 'Salaries', value: 45000, color: '#3B82F6' },
-    { name: 'Utilities', value: 25000, color: '#10B981' },
-    { name: 'Supplies', value: 15000, color: '#F59E0B' },
-    { name: 'Maintenance', value: 8000, color: '#EF4444' },
-    { name: 'Other', value: 7000, color: '#8B5CF6' },
-  ];
+  // Real Data State
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [expenseBreakdown, setExpenseBreakdown] = useState<any[]>([]);
+  const [chartRange, setChartRange] = useState('6m');
 
   useEffect(() => {
-    fetchBranch();
+    fetchBranchData();
   }, [branchId]);
 
-  const fetchBranch = async () => {
+  useEffect(() => {
+    if (branchId) {
+      fetchCharts();
+    }
+  }, [branchId, chartRange]);
+
+  const fetchBranchData = async () => {
     try {
       setLoading(true);
       const fetchedBranch = await branchAPI.detail(branchId);
@@ -78,6 +71,19 @@ const BranchDetail = () => {
       alert(`Error fetching branch: ${errorMessage}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCharts = async () => {
+    try {
+      const [perfData, expData] = await Promise.all([
+        branchAPI.getBranchPerformance(branchId, chartRange),
+        branchAPI.getExpenseBreakdown(branchId, '1m') // Keep breakdown to 1m default or separate control
+      ]);
+      setPerformanceData(perfData);
+      setExpenseBreakdown(expData);
+    } catch (error) {
+      console.error("Error fetching charts:", error);
     }
   };
 
@@ -145,7 +151,7 @@ const BranchDetail = () => {
             <FaArrowLeft /> Back to Branches
           </button>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-100 rounded-lg">
@@ -155,17 +161,16 @@ const BranchDetail = () => {
               <h1 className="text-3xl font-bold">{branch.name}</h1>
               <p className="text-gray-600">Branch ID: {branch.branch_id}</p>
               <span
-                className={`inline-block px-2 py-1 rounded-full text-sm font-medium ${
-                  branch.status === "active"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-700"
-                }`}
+                className={`inline-block px-2 py-1 rounded-full text-sm font-medium ${branch.status === "active"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+                  }`}
               >
                 {branch.status}
               </span>
             </div>
           </div>
-          
+
           {user.role === 'admin' && (
             <div className="flex gap-2">
               <button
@@ -196,7 +201,7 @@ const BranchDetail = () => {
             <FaChartLine className="text-blue-500 text-2xl" />
           </div>
         </div>
-        
+
         <div className="p-6 border rounded-lg shadow-sm bg-red-50">
           <div className="flex items-center justify-between">
             <div>
@@ -206,7 +211,7 @@ const BranchDetail = () => {
             <FaChartLine className="text-red-500 text-2xl" />
           </div>
         </div>
-        
+
         <div className="p-6 border rounded-lg shadow-sm bg-green-50">
           <div className="flex items-center justify-between">
             <div>
@@ -217,7 +222,7 @@ const BranchDetail = () => {
             <FaChartLine className="text-green-500 text-2xl" />
           </div>
         </div>
-        
+
         <div className="p-6 border rounded-lg shadow-sm bg-purple-50">
           <div className="flex items-center justify-between">
             <div>
@@ -242,7 +247,7 @@ const BranchDetail = () => {
                   <p className="text-gray-600">{branch.address}, {branch.city}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <FaPhone className="text-gray-400" />
                 <div>
@@ -250,7 +255,7 @@ const BranchDetail = () => {
                   <p className="text-gray-600">{branch.phone}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <FaEnvelope className="text-gray-400" />
                 <div>
@@ -258,7 +263,7 @@ const BranchDetail = () => {
                   <p className="text-gray-600">{branch.email}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <FaUsers className="text-gray-400" />
                 <div>
@@ -266,7 +271,7 @@ const BranchDetail = () => {
                   <p className="text-gray-600">{branch.branch_manager}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <FaCalendar className="text-gray-400" />
                 <div>
@@ -274,7 +279,7 @@ const BranchDetail = () => {
                   <p className="text-gray-600">{new Date(branch.opening_date).toLocaleDateString()}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <FaUsers className="text-gray-400" />
                 <div>
@@ -288,25 +293,29 @@ const BranchDetail = () => {
           {/* Expense Breakdown */}
           <div className="bg-white rounded-lg border shadow-sm p-6">
             <h2 className="text-xl font-semibold mb-4">Expense Breakdown</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={expenseBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {expenseBreakdown.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `₨ ${Number(value).toLocaleString()}`} />
-              </PieChart>
-            </ResponsiveContainer>
+            {expenseBreakdown.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={expenseBreakdown}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {expenseBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => `₨ ${Number(value).toLocaleString()}`} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-gray-400">No expenses recorded</div>
+            )}
           </div>
         </div>
 
@@ -314,33 +323,41 @@ const BranchDetail = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Revenue vs Expenses */}
           <div className="bg-white rounded-lg border shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4">Monthly Revenue vs Expenses</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip formatter={(value) => `₨ ${Number(value).toLocaleString()}`} />
-                <Legend />
-                <Bar dataKey="revenue" fill="#3B82F6" name="Revenue" />
-                <Bar dataKey="expenses" fill="#EF4444" name="Expenses" />
-              </BarChart>
-            </ResponsiveContainer>
+            <h2 className="text-xl font-semibold mb-4">Revenue vs Expenses (Last 6 Months)</h2>
+            {performanceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={performanceData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `₨ ${Number(value).toLocaleString()}`} />
+                  <Legend />
+                  <Bar dataKey="revenue" fill="#3B82F6" name="Revenue" />
+                  <Bar dataKey="expenses" fill="#EF4444" name="Expenses" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-gray-400">No data available</div>
+            )}
           </div>
 
           {/* Orders Trend */}
           <div className="bg-white rounded-lg border shadow-sm p-6">
             <h2 className="text-xl font-semibold mb-4">Orders Trend</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="orders" stroke="#10B981" strokeWidth={2} name="Orders" />
-              </LineChart>
-            </ResponsiveContainer>
+            {performanceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={performanceData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="orders" stroke="#10B981" strokeWidth={2} name="Orders" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-gray-400">No order data available</div>
+            )}
           </div>
         </div>
       </div>

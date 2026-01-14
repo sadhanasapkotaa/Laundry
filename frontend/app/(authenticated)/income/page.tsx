@@ -1,14 +1,17 @@
 "use client";
 
 import "../../types/i18n";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaDollarSign,
   FaArrowTrendUp,
+  FaArrowTrendDown,
   FaCreditCard,
   FaMoneyBillWave,
   FaChartLine,
+  FaFilter,
+  FaDownload,
 } from "react-icons/fa6";
 import {
   ResponsiveContainer,
@@ -23,93 +26,260 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import { API_CONFIG, getAuthHeaders, getFullUrl } from "../../config/api";
 
-interface IncomeRecord {
-  id: string;
-  date: string;
-  amount: number;
-  paymentMethod: "cash" | "online" | "card";
-  branchId: string;
-  branchName: string;
-  orderId: string;
-  customerName: string;
-  serviceType: string;
+interface Income {
+  id: number;
+  branch: number;
+  branch_name: string;
+  branch_id_display: string;
+  category: number;
+  category_name: string;
+  amount: string;
+  description: string;
+  date_received: string;
+  payment_reference?: {
+    transaction_uuid: string;
+    amount: string;
+    payment_type: string;
+    status: string;
+  };
+}
+
+interface Statistics {
+  period: string;
+  current_period: {
+    total: number;
+    count: number;
+    average: number;
+    start_date: string;
+    end_date: string;
+  };
+  previous_period: {
+    total: number;
+    count: number;
+    start_date: string;
+    end_date: string;
+  };
+  growth_percentage: number;
+  payment_methods: Record<string, number>;
+}
+
+interface TimeSeriesData {
+  period: string;
+  total: number;
+  count: number;
 }
 
 const IncomeTracking = () => {
   const { t } = useTranslation();
+  
+  const [incomeRecords, setIncomeRecords] = useState<Income[]>([]);
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
+  const [selectedBranch, setSelectedBranch] = useState<string>('');
+  const [branches, setBranches] = useState<any[]>([]);
 
-  const [incomeRecords] = useState<IncomeRecord[]>([
-    {
-      id: "INC-001",
-      date: "2025-01-06",
-      amount: 1200,
-      paymentMethod: "card",
-      branchId: "BR-001",
-      branchName: "Main Branch",
-      orderId: "ORD-001",
-      customerName: "Ram Sharma",
-      serviceType: "Dry Cleaning",
-    },
-    {
-      id: "INC-002",
-      date: "2025-01-06",
-      amount: 850,
-      paymentMethod: "cash",
-      branchId: "BR-001",
-      branchName: "Main Branch",
-      orderId: "ORD-002",
-      customerName: "Sita Rai",
-      serviceType: "Wash & Fold",
-    },
-    {
-      id: "INC-003",
-      date: "2025-01-05",
-      amount: 950,
-      paymentMethod: "online",
-      branchId: "BR-002",
-      branchName: "Downtown Branch",
-      orderId: "ORD-003",
-      customerName: "John Doe",
-      serviceType: "Express Wash",
-    },
-  ]);
+  // Fetch branches
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const response = await fetch(getFullUrl(API_CONFIG.ENDPOINTS.BRANCHES.LIST), {
+          headers: getAuthHeaders(),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setBranches(data.results || data);
+        }
+      } catch (error) {
+        console.error('Error fetching branches:', error);
+      }
+    };
+    fetchBranches();
+  }, []);
 
-  const totalIncome = incomeRecords.reduce((sum, record) => sum + record.amount, 0);
-  const monthlyTarget = 150000;
-  const dailyAverage = totalIncome / 7; // Assuming 7 days
+  // Fetch income data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch statistics
+        const statsUrl = new URL(getFullUrl(API_CONFIG.ENDPOINTS.ACCOUNTING.INCOME.STATISTICS));
+        statsUrl.searchParams.append('period', selectedPeriod);
+        if (selectedBranch) {
+          statsUrl.searchParams.append('branch', selectedBranch);
+        }
+        
+        const statsResponse = await fetch(statsUrl.toString(), {
+          headers: getAuthHeaders(),
+        });
+        
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setStatistics(statsData);
+        }
 
-  const paymentMethodData = [
-    { name: t("income.cash"), value: incomeRecords.filter(r => r.paymentMethod === "cash").reduce((sum, r) => sum + r.amount, 0), color: "#10B981" },
-    { name: t("income.online"), value: incomeRecords.filter(r => r.paymentMethod === "online").reduce((sum, r) => sum + r.amount, 0), color: "#3B82F6" },
-    { name: t("income.card"), value: incomeRecords.filter(r => r.paymentMethod === "card").reduce((sum, r) => sum + r.amount, 0), color: "#F59E0B" },
-  ];
+        // Fetch time series data
+        const timeUrl = new URL(getFullUrl(API_CONFIG.ENDPOINTS.ACCOUNTING.INCOME.BY_TIME));
+        timeUrl.searchParams.append('period', selectedPeriod);
+        if (selectedBranch) {
+          timeUrl.searchParams.append('branch', selectedBranch);
+        }
+        
+        const timeResponse = await fetch(timeUrl.toString(), {
+          headers: getAuthHeaders(),
+        });
+        
+        if (timeResponse.ok) {
+          const timeData = await timeResponse.json();
+          setTimeSeriesData(timeData);
+        }
+
+        // Fetch recent income records
+        const incomeUrl = new URL(getFullUrl(API_CONFIG.ENDPOINTS.ACCOUNTING.INCOME.LIST));
+        if (selectedBranch) {
+          incomeUrl.searchParams.append('branch', selectedBranch);
+        }
+        incomeUrl.searchParams.append('page_size', '10');
+        
+        const incomeResponse = await fetch(incomeUrl.toString(), {
+          headers: getAuthHeaders(),
+        });
+        
+        if (incomeResponse.ok) {
+          const incomeData = await incomeResponse.json();
+          setIncomeRecords(incomeData.results || incomeData);
+        }
+      } catch (error) {
+        console.error('Error fetching income data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedPeriod, selectedBranch]);
+
+  // Calculate totals
+  const totalIncome = statistics?.current_period?.total || 0;
+  const previousIncome = statistics?.previous_period?.total || 0;
+  const growthPercentage = statistics?.growth_percentage || 0;
+  const averageIncome = statistics?.current_period?.average || 0;
+
+  // Prepare payment method chart data
+  const paymentMethodData = statistics?.payment_methods
+    ? Object.entries(statistics.payment_methods).map(([method, value]) => ({
+        name: method === 'cash' ? 'Cash' : method === 'esewa' ? 'eSewa' : 'Bank',
+        value: value,
+        color: method === 'cash' ? '#10B981' : method === 'esewa' ? '#3B82F6' : '#F59E0B',
+      }))
+    : [];
+
+  // Prepare chart data for time series
+  const chartData = timeSeriesData.map(item => ({
+    name: formatPeriodLabel(item.period, selectedPeriod),
+    income: parseFloat(item.total.toString()),
+    count: item.count,
+  })).reverse();
+
+  function formatPeriodLabel(period: string, periodType: string): string {
+    const date = new Date(period);
+    if (periodType === 'daily') {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else if (periodType === 'weekly') {
+      return `Week ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    } else if (periodType === 'monthly') {
+      return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    } else {
+      return date.getFullYear().toString();
+    }
+  }
+
+  function formatCurrency(amount: number | string): string {
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return `₨ ${num.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  if (loading && !statistics) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-xl">Loading income data...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-6 pt-16 md:pt-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold">{t("income.title")}</h1>
+        
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3">
+          <select
+            value={selectedBranch}
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Branches</option>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex gap-2 border rounded-lg p-1">
+            {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((period) => (
+              <button
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
+                className={`px-4 py-1 rounded-md transition-colors ${
+                  selectedPeriod === period
+                    ? 'bg-blue-500 text-white'
+                    : 'hover:bg-gray-100'
+                }`}
+              >
+                {period.charAt(0).toUpperCase() + period.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="p-6 border rounded-lg shadow-sm bg-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">{t("income.totalIncome")}</p>
-              <p className="text-2xl font-bold text-green-600">₨ {totalIncome.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
+              <div className="flex items-center mt-2 text-sm">
+                {growthPercentage >= 0 ? (
+                  <FaArrowTrendUp className="text-green-500 mr-1" />
+                ) : (
+                  <FaArrowTrendDown className="text-red-500 mr-1" />
+                )}
+                <span className={growthPercentage >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {Math.abs(growthPercentage).toFixed(1)}% vs previous period
+                </span>
+              </div>
             </div>
-            <FaDollarSign className="text-green-500 text-2xl" />
+            <FaDollarSign className="text-green-500 text-3xl" />
           </div>
         </div>
 
         <div className="p-6 border rounded-lg shadow-sm bg-white">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">{t("income.monthlyTarget")}</p>
-              <p className="text-2xl font-bold text-blue-600">₨ {monthlyTarget.toLocaleString()}</p>
+              <p className="text-sm font-medium text-gray-600">Previous Period</p>
+              <p className="text-2xl font-bold text-gray-700">{formatCurrency(previousIncome)}</p>
+              <p className="text-sm text-gray-500 mt-2">
+                {statistics?.previous_period?.count || 0} transactions
+              </p>
             </div>
-            <FaArrowTrendUp className="text-blue-500 text-2xl" />
+            <FaChartLine className="text-gray-500 text-3xl" />
           </div>
         </div>
 
@@ -117,56 +287,67 @@ const IncomeTracking = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">{t("income.dailyAverage")}</p>
-              <p className="text-2xl font-bold text-purple-600">₨ {Math.round(dailyAverage).toLocaleString()}</p>
+              <p className="text-2xl font-bold text-purple-600">{formatCurrency(averageIncome)}</p>
+              <p className="text-sm text-gray-500 mt-2">Per transaction</p>
             </div>
-            <FaChartLine className="text-purple-500 text-2xl" />
+            <FaArrowTrendUp className="text-purple-500 text-3xl" />
+          </div>
+        </div>
+
+        <div className="p-6 border rounded-lg shadow-sm bg-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Transactions</p>
+              <p className="text-2xl font-bold text-blue-600">{statistics?.current_period?.count || 0}</p>
+              <p className="text-sm text-gray-500 mt-2">
+                {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)}
+              </p>
+            </div>
+            <FaCreditCard className="text-blue-500 text-3xl" />
           </div>
         </div>
       </div>
 
-      {/* Payment Method Distribution */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="p-6 border rounded-lg shadow-sm bg-white">
-          <h2 className="text-lg font-semibold mb-4">{t("income.paymentMethod")} Distribution</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={paymentMethodData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  dataKey="value"
-                  nameKey="name"
-                  label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                >
-                  {paymentMethodData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+        {/* Payment Method Distribution */}
+        {paymentMethodData.length > 0 && (
+          <div className="p-6 border rounded-lg shadow-sm bg-white">
+            <h2 className="text-lg font-semibold mb-4">Payment Method Distribution</h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={paymentMethodData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                  >
+                    {paymentMethodData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
+        )}
 
+        {/* Income Trend */}
         <div className="p-6 border rounded-lg shadow-sm bg-white">
-          <h2 className="text-lg font-semibold mb-4">Daily Income Trend</h2>
+          <h2 className="text-lg font-semibold mb-4">Income Trend ({selectedPeriod})</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[
-                { day: "Mon", income: 2500 },
-                { day: "Tue", income: 3200 },
-                { day: "Wed", income: 2800 },
-                { day: "Thu", income: 3500 },
-                { day: "Fri", income: 4100 },
-                { day: "Sat", income: 4800 },
-                { day: "Sun", income: 3000 },
-              ]}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
+                <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip formatter={(value: any) => formatCurrency(value)} />
                 <Bar dataKey="income" fill="#3B82F6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -176,43 +357,73 @@ const IncomeTracking = () => {
 
       {/* Recent Income Records */}
       <div className="p-6 border rounded-lg shadow-sm bg-white">
-        <h2 className="text-lg font-semibold mb-4">Recent Income Records</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Recent Income Records</h2>
+          <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+            <FaDownload />
+            Export
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b">
                 <th className="text-left py-2">Date</th>
-                <th className="text-left py-2">Order ID</th>
-                <th className="text-left py-2">Customer</th>
-                <th className="text-left py-2">Service</th>
-                <th className="text-left py-2">Payment Method</th>
                 <th className="text-left py-2">Branch</th>
+                <th className="text-left py-2">Category</th>
+                <th className="text-left py-2">Description</th>
+                <th className="text-left py-2">Payment Type</th>
                 <th className="text-right py-2">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {incomeRecords.map((record) => (
-                <tr key={record.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3">{record.date}</td>
-                  <td className="py-3">{record.orderId}</td>
-                  <td className="py-3">{record.customerName}</td>
-                  <td className="py-3">{record.serviceType}</td>
-                  <td className="py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                      record.paymentMethod === "cash" ? "bg-green-100 text-green-800" :
-                      record.paymentMethod === "online" ? "bg-blue-100 text-blue-800" :
-                      "bg-yellow-100 text-yellow-800"
-                    }`}>
-                      {record.paymentMethod === "cash" ? <FaMoneyBillWave /> :
-                       record.paymentMethod === "online" ? <FaDollarSign /> :
-                       <FaCreditCard />}
-                      {t(`income.${record.paymentMethod}`)}
-                    </span>
+              {incomeRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-500">
+                    No income records found
                   </td>
-                  <td className="py-3">{record.branchName}</td>
-                  <td className="py-3 text-right font-semibold">₨ {record.amount.toLocaleString()}</td>
                 </tr>
-              ))}
+              ) : (
+                incomeRecords.map((record) => (
+                  <tr key={record.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3">
+                      {new Date(record.date_received).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </td>
+                    <td className="py-3">{record.branch_name}</td>
+                    <td className="py-3">{record.category_name}</td>
+                    <td className="py-3 max-w-xs truncate">{record.description || '-'}</td>
+                    <td className="py-3">
+                      {record.payment_reference ? (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                            record.payment_reference.payment_type === 'cash'
+                              ? 'bg-green-100 text-green-800'
+                              : record.payment_reference.payment_type === 'esewa'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {record.payment_reference.payment_type === 'cash' ? (
+                            <FaMoneyBillWave />
+                          ) : record.payment_reference.payment_type === 'esewa' ? (
+                            <FaDollarSign />
+                          ) : (
+                            <FaCreditCard />
+                          )}
+                          {record.payment_reference.payment_type}
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 text-xs">Manual Entry</span>
+                      )}
+                    </td>
+                    <td className="py-3 text-right font-semibold">{formatCurrency(record.amount)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

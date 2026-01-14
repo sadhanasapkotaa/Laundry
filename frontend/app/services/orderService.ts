@@ -40,6 +40,7 @@ export interface Order {
   description?: string;
   delivery_contact?: string;
   esewa_reference?: string;
+  discount?: number;
 }
 
 export interface CreateOrderRequest {
@@ -58,7 +59,7 @@ export interface CreateOrderRequest {
   is_urgent: boolean;
   total_amount: number;
   payment_method: 'cash' | 'bank' | 'esewa';
-  payment_status: 'pending' | 'paid';
+  payment_status: 'pending' | 'partially_paid' | 'paid' | 'failed';
   description?: string;
   delivery_contact?: string;
 }

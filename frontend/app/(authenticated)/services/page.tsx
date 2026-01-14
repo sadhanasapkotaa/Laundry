@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { FiSettings, FiPlus, FiEdit2, FiTrash2, FiDollarSign, FiSave, FiX, FiCheckCircle } from "react-icons/fi";
+import { FiSettings, FiPlus, FiTrash2, FiDollarSign, FiSave, FiX, FiCheckCircle } from "react-icons/fi";
 import {
     settingsAPI, washTypeAPI, clothNameAPI, clothTypeAPI, pricingRuleAPI,
     SystemSettings, WashType, ClothName, ClothType, PricingRule
@@ -74,6 +74,7 @@ export default function ServicesSettingsPage() {
             setSettings(updated);
             showSuccess("Settings saved successfully!");
         } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             setError("Failed to save settings");
         } finally {
             setSaving(false);
@@ -91,6 +92,7 @@ export default function ServicesSettingsPage() {
             showSuccess(`${type.replace('-', ' ')} added successfully!`);
             fetchData();
         } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             setError(`Failed to add ${type}`);
         } finally {
             setSaving(false);
@@ -106,6 +108,7 @@ export default function ServicesSettingsPage() {
             showSuccess("Item deleted successfully!");
             fetchData();
         } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             setError("Failed to delete item");
         }
     };
@@ -129,6 +132,7 @@ export default function ServicesSettingsPage() {
             showSuccess("Pricing rule added successfully!");
             fetchData();
         } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             setError("Failed to add pricing rule. It may already exist.");
         } finally {
             setSaving(false);
@@ -143,6 +147,7 @@ export default function ServicesSettingsPage() {
             showSuccess("Pricing rule deleted!");
             fetchData();
         } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             setError("Failed to delete pricing rule");
         }
     };

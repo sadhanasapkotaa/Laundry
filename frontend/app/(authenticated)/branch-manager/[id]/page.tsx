@@ -19,24 +19,8 @@ import {
   FaChartLine,
   FaClipboardList
 } from "react-icons/fa";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
-
-interface BranchManager {
-  id: string;
-  manager_id: string;
-  user_email: string;
-  user_name: string;
-  branch_id: string;
-  branch_name: string;
-  salary: number;
-  hired_date: string;
-  leaving_date?: string;
-  id_type: string;
-  citizenship_number: string;
-  is_active: boolean;
-  created: string;
-  phone?: string;
-}
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar } from 'recharts';
+import { branchManagerAPI, BranchManager } from "../../../services/branchManagerService";
 
 interface User {
   role: 'admin' | 'branch_manager' | 'customer' | 'rider' | 'accountant';
@@ -61,24 +45,7 @@ export default function BranchManagerDetail() {
   // Mock user data
   const [user] = useState<User>({ role: 'admin' });
 
-  // Mock manager data
-  const mockManager: BranchManager = {
-    id: "1",
-    manager_id: "MGR-001",
-    user_email: "john.manager@laundrypro.com",
-    user_name: "John Manager",
-    branch_id: "1",
-    branch_name: "Main Branch",
-    salary: 75000,
-    hired_date: "2023-01-15",
-    id_type: "citizenship",
-    citizenship_number: "123456789",
-    is_active: true,
-    created: "2023-01-15",
-    phone: "+977-9841234567",
-  };
-
-  // Mock performance data
+  // Mock performance data - This can be replaced with a real API call later
   const mockPerformanceData: PerformanceData[] = [
     { month: "Jan", orders: 245, revenue: 185000, customer_satisfaction: 4.5 },
     { month: "Feb", orders: 268, revenue: 201000, customer_satisfaction: 4.3 },
@@ -89,12 +56,26 @@ export default function BranchManagerDetail() {
   ];
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setManager(mockManager);
-      setPerformanceData(mockPerformanceData);
-      setLoading(false);
-    }, 1000);
+    if (!managerId) return;
+
+    const fetchManagerDetails = async () => {
+      try {
+        setLoading(true);
+        const fetchedManager = await branchManagerAPI.detail(managerId);
+        setManager(fetchedManager);
+        // For now, we'll keep the performance data mocked
+        setPerformanceData(mockPerformanceData);
+      } catch (error) {
+        console.error("Error fetching branch manager details:", error);
+        alert("Failed to fetch branch manager details.");
+        setManager(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchManagerDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [managerId]);
 
   const handleDeleteManager = async () => {
@@ -104,8 +85,14 @@ export default function BranchManagerDetail() {
     }
 
     if (window.confirm('Are you sure you want to delete this branch manager?')) {
-      alert('Branch manager deleted successfully');
-      router.push('/branch-manager');
+      try {
+        await branchManagerAPI.delete(managerId);
+        alert('Branch manager deleted successfully');
+        router.push('/branch-manager');
+      } catch (error) {
+        console.error('Error deleting branch manager:', error);
+        alert('Failed to delete branch manager.');
+      }
     }
   };
 
@@ -261,12 +248,12 @@ export default function BranchManagerDetail() {
               </div>
             </div>
 
-            {manager.phone && (
+            {manager.user_phone && (
               <div className="flex items-center gap-3">
                 <FaPhone className="text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600">Phone</p>
-                  <p className="font-medium">{manager.phone}</p>
+                  <p className="font-medium">{manager.user_phone}</p>
                 </div>
               </div>
             )}

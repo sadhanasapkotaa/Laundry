@@ -18,7 +18,11 @@ interface OrderData {
     };
     cart: Array<{
         id: string;
+        washTypeId: number;
+        washTypeName: string;
+        clothNameId: number;
         clothName: string;
+        clothTypeId: number;
         material: string;
         quantity: number;
         clothType: "individual" | "bulk";
@@ -161,6 +165,7 @@ export default function CustomerCheckoutPage() {
                 branch: data.branch,
                 services: data.cart.map(item => ({
                     service_type: item.clothName,
+                    wash_type: item.washTypeName, // Include wash type
                     material: item.material,
                     quantity: item.quantity,
                     pricing_type: item.clothType,
@@ -369,7 +374,7 @@ export default function CustomerCheckoutPage() {
                                         </div>
                                         <div>
                                             <p className="font-medium text-gray-900 dark:text-gray-100">{item.clothName}</p>
-                                            <p className="text-xs text-gray-500 capitalize">{item.material} • {item.clothType}</p>
+                                            <p className="text-xs text-gray-500 capitalize">{item.washTypeName} • {item.material} • {item.clothType}</p>
                                         </div>
                                     </div>
                                     <p className="font-bold text-gray-900 dark:text-gray-100">₨ {item.price}</p>

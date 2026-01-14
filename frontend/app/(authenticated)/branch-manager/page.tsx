@@ -12,7 +12,6 @@ import {
   FaSearch,
   FaFilter,
   FaEye,
-  FaPhone,
   FaEnvelope,
   FaCalendar,
   FaMoneyBillWave,
@@ -44,12 +43,17 @@ export default function BranchManagerManagement() {
     try {
       setLoading(true);
       const fetchedManagers = await branchManagerAPI.list();
-      setManagers(fetchedManagers);
-      setFilteredManagers(fetchedManagers);
+      // Ensure we always have an array
+      const managersArray = Array.isArray(fetchedManagers) ? fetchedManagers : [];
+      setManagers(managersArray);
+      setFilteredManagers(managersArray);
     } catch (error: unknown) {
       console.error('Error fetching branch managers:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       alert(`Error fetching branch managers: ${errorMessage}`);
+      // Set empty arrays on error to prevent crashes
+      setManagers([]);
+      setFilteredManagers([]);
     } finally {
       setLoading(false);
     }
@@ -57,9 +61,16 @@ export default function BranchManagerManagement() {
 
   useEffect(() => {
     filterManagers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [managers, searchTerm, statusFilter, branchFilter]);
 
   const filterManagers = () => {
+    // Ensure managers is an array before trying to filter
+    if (!Array.isArray(managers)) {
+      setFilteredManagers([]);
+      return;
+    }
+
     let filtered = [...managers];
 
     // Apply search filter
@@ -96,7 +107,13 @@ export default function BranchManagerManagement() {
     if (window.confirm('Are you sure you want to delete this branch manager?')) {
       try {
         await branchManagerAPI.delete(managerId);
-        setManagers(managers.filter(manager => manager.id !== managerId));
+        // Ensure managers is an array before filtering
+        if (Array.isArray(managers)) {
+          setManagers(managers.filter(manager => manager.id !== managerId));
+        } else {
+          // If managers is not an array, refetch the data
+          await fetchBranchManagers();
+        }
         alert('Branch manager deleted successfully');
       } catch (error: unknown) {
         console.error('Error deleting branch manager:', error);
@@ -106,10 +123,12 @@ export default function BranchManagerManagement() {
     }
   };
 
-  const uniqueBranches = [...new Set(managers.map(manager => ({ 
-    id: manager.branch.toString(), 
-    name: manager.branch_name 
-  })))];
+  const uniqueBranches = Array.isArray(managers)
+    ? Array.from(new Map(managers.map(manager => [manager.branch.toString(), {
+        id: manager.branch.toString(),
+        name: manager.branch_name
+      }])).values())
+    : [];
 
   if (loading) {
     return (
@@ -212,7 +231,9 @@ export default function BranchManagerManagement() {
             <p className="text-sm font-medium text-blue-700">Total Managers</p>
             <FaUser className="text-blue-500" />
           </div>
-          <p className="text-2xl font-bold mt-2 text-blue-900">{filteredManagers.length}</p>
+          <p className="text-2xl font-bold mt-2 text-blue-900">
+            {Array.isArray(filteredManagers) ? filteredManagers.length : 0}
+          </p>
         </div>
         <div className="p-4 border rounded-lg shadow-sm bg-green-50">
           <div className="flex justify-between items-center">
@@ -220,7 +241,7 @@ export default function BranchManagerManagement() {
             <FaUser className="text-green-500" />
           </div>
           <p className="text-2xl font-bold mt-2 text-green-900">
-            {filteredManagers.filter(m => m.is_active).length}
+            {Array.isArray(filteredManagers) ? filteredManagers.filter(m => m.is_active).length : 0}
           </p>
         </div>
         <div className="p-4 border rounded-lg shadow-sm bg-orange-50">
@@ -229,7 +250,7 @@ export default function BranchManagerManagement() {
             <FaMoneyBillWave className="text-orange-500" />
           </div>
           <p className="text-2xl font-bold mt-2 text-orange-900">
-            ₨ {Math.round(filteredManagers.reduce((sum, m) => sum + m.salary, 0) / filteredManagers.length || 0).toLocaleString()}
+            ₨ {Array.isArray(filteredManagers) ? Math.round(filteredManagers.reduce((sum, m) => sum + m.salary, 0) / filteredManagers.length || 0).toLocaleString() : 0}
           </p>
         </div>
         <div className="p-4 border rounded-lg shadow-sm bg-purple-50">
@@ -238,7 +259,7 @@ export default function BranchManagerManagement() {
             <FaMoneyBillWave className="text-purple-500" />
           </div>
           <p className="text-2xl font-bold mt-2 text-purple-900">
-            ₨ {filteredManagers.reduce((sum, m) => sum + m.salary, 0).toLocaleString()}
+            ₨ {Array.isArray(filteredManagers) ? filteredManagers.reduce((sum, m) => sum + m.salary, 0).toLocaleString() : 0}
           </p>
         </div>
       </div>
@@ -246,10 +267,10 @@ export default function BranchManagerManagement() {
       {/* Manager List */}
       <div className="p-4 border rounded-lg shadow-sm">
         <h2 className="text-lg font-semibold mb-4">
-          All Branch Managers ({filteredManagers.length})
+          All Branch Managers ({Array.isArray(filteredManagers) ? filteredManagers.length : 0})
         </h2>
         <div className="space-y-4">
-          {filteredManagers.map((manager) => (
+          {Array.isArray(filteredManagers) && filteredManagers.map((manager) => (
             <div
               key={manager.id}
               className="border rounded-lg p-4 flex items-start justify-between hover:bg-gray-50"

@@ -820,6 +820,237 @@ def user_subscription_status(request):
             'success': True,
             'subscription': None
         })
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_bank_payment(request, transaction_uuid):
+    """
+    Verify and complete bank payment - only for admin/staff users
+    This endpoint allows staff to mark a bank payment as COMPLETE when the bank transfer is received
+    """
+    try:
+        # Check if user has permission to verify payments (staff or admin)
+        if not request.user.is_staff:
+            return Response({
+                'success': False,
+                'error': 'You do not have permission to verify payments'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        logger.info(f"[BANK_VERIFY] Staff user {request.user.email} verifying payment {transaction_uuid}")
+        
+        # Get verification details from request
+        data = request.data
+        transaction_code = data.get('transaction_code')  # Bank reference number
+        notes = data.get('notes', '')  # Optional notes about the bank transfer
+        
+        with transaction.atomic():
+            # Lock and get the payment
+            payment = Payment.objects.select_for_update().get(
+                transaction_uuid=transaction_uuid
+            )
+            
+            # Verify this is a bank payment
+            if payment.payment_type != 'bank':
+                return Response({
+                    'success': False,
+                    'error': 'This endpoint is only for bank payments'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if already verified
+            if payment.status == 'COMPLETE' and payment.processed_at:
+                logger.info(f"[BANK_VERIFY] Payment {transaction_uuid} already verified at {payment.processed_at}")
+                return Response({
+                    'success': True,
+                    'message': 'Payment was already verified',
+                    'payment': {
+                        'transaction_uuid': payment.transaction_uuid,
+                        'status': payment.status,
+                        'amount': float(payment.total_amount),
+                        'verified_at': payment.processed_at.isoformat()
+                    }
+                })
+            
+            # Mark payment as complete
+            old_status = payment.status
+            payment.status = 'COMPLETE'
+            payment.processed_at = timezone.now()
+            if transaction_code:
+                payment.transaction_code = transaction_code
+                payment.ref_id = transaction_code
+            payment.save()
+            
+            logger.info(f"[BANK_VERIFY] Bank payment verified - Transaction: {transaction_uuid}, Status: {old_status} -> COMPLETE, Ref: {transaction_code}")
+        
+        # Process the payment (distribute to orders)
+        process_view = ProcessPaymentView()
+        response = process_view.post(request, transaction_uuid)
+        
+        # Return success with payment details
+        return response
+        
+    except Payment.DoesNotExist:
+        return Response({
+            'success': False,
+            'error': 'Payment not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.exception(f"[BANK_VERIFY] Error verifying bank payment: {e}")
+        return Response({
+            'success': False,
+            'error': f'Failed to verify payment: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def pending_bank_payments(request):
+    """
+    List all pending bank payments - only for admin/staff users
+    This helps staff see which bank payments are awaiting verification
+    """
+    try:
+        # Check if user has permission to view pending payments (staff or admin)
+        if not request.user.is_staff:
+            return Response({
+                'success': False,
+                'error': 'You do not have permission to view pending payments'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get query parameters for filtering
+        branch_id = request.GET.get('branch_id')
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        
+        # Get all pending bank payments
+        pending_payments = Payment.objects.filter(
+            payment_type='bank',
+            status='PENDING'
+        ).order_by('-created_at')
+        
+        # Filter by branch if specified
+        if branch_id:
+            pending_payments = pending_payments.filter(branch_id=branch_id)
+        
+        # Paginate
+        from django.core.paginator import Paginator
+        paginator = Paginator(pending_payments, page_size)
+        page_obj = paginator.get_page(page)
+        
+        # Serialize payments
+        payments_data = []
+        for payment in page_obj:
+            payments_data.append({
+                'id': payment.id,
+                'transaction_uuid': payment.transaction_uuid,
+                'user_name': payment.user.get_full_name() or payment.user.email,
+                'user_email': payment.user.email,
+                'amount': float(payment.total_amount),
+                'branch_name': payment.branch.name if payment.branch else None,
+                'branch_id': payment.branch.id if payment.branch else None,
+                'created_at': payment.created_at.isoformat(),
+                'status': payment.status,
+                'payment_source': payment.payment_source,
+            })
+        
+        return Response({
+            'success': True,
+            'pending_payments': payments_data,
+            'pagination': {
+                'current_page': page_obj.number,
+                'total_pages': paginator.num_pages,
+                'total_count': paginator.count,
+                'has_next': page_obj.has_next(),
+                'has_previous': page_obj.has_previous(),
+            }
+        })
+        
+    except Exception as e:
+        logger.exception(f"Error fetching pending bank payments: {e}")
+        return Response({
+            'success': False,
+            'error': 'Failed to fetch pending payments'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def verify_bank_payment(request, transaction_uuid):
+    """
+    Verify and complete bank payment - only for admin/staff users
+    This endpoint allows staff to mark a bank payment as COMPLETE when the bank transfer is received
+    """
+    try:
+        # Check if user has permission to verify payments (staff or admin)
+        if not request.user.is_staff:
+            return Response({
+                'success': False,
+                'error': 'You do not have permission to verify payments'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        logger.info(f"[BANK_VERIFY] Staff user {request.user.email} verifying payment {transaction_uuid}")
+        
+        # Get verification details from request
+        data = request.data
+        transaction_code = data.get('transaction_code')  # Bank reference number
+        notes = data.get('notes', '')  # Optional notes about the bank transfer
+        
+        with transaction.atomic():
+            # Lock and get the payment
+            payment = Payment.objects.select_for_update().get(
+                transaction_uuid=transaction_uuid
+            )
+            
+            # Verify this is a bank payment
+            if payment.payment_type != 'bank':
+                return Response({
+                    'success': False,
+                    'error': 'This endpoint is only for bank payments'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if already verified
+            if payment.status == 'COMPLETE' and payment.processed_at:
+                logger.info(f"[BANK_VERIFY] Payment {transaction_uuid} already verified at {payment.processed_at}")
+                return Response({
+                    'success': True,
+                    'message': 'Payment was already verified',
+                    'payment': {
+                        'transaction_uuid': payment.transaction_uuid,
+                        'status': payment.status,
+                        'amount': float(payment.total_amount),
+                        'verified_at': payment.processed_at.isoformat()
+                    }
+                })
+            
+            # Mark payment as complete
+            old_status = payment.status
+            payment.status = 'COMPLETE'
+            payment.processed_at = timezone.now()
+            if transaction_code:
+                payment.transaction_code = transaction_code
+                payment.ref_id = transaction_code
+            payment.save()
+            
+            logger.info(f"[BANK_VERIFY] Bank payment verified - Transaction: {transaction_uuid}, Status: {old_status} -> COMPLETE, Ref: {transaction_code}")
+        
+        # Process the payment (distribute to orders)
+        process_view = ProcessPaymentView()
+        response = process_view.post(request, transaction_uuid)
+        
+        # Return success with payment details
+        return response
+        
+    except Payment.DoesNotExist:
+        return Response({
+            'success': False,
+            'error': 'Payment not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.exception(f"[BANK_VERIFY] Error verifying bank payment: {e}")
+        return Response({
+            'success': False,
+            'error': f'Failed to verify payment: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def payment_history(request):

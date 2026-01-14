@@ -71,7 +71,7 @@ export const branchAPI = {
 
     const endpoint = `/branch/branches/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     const response = await api.get<PaginatedBranchResponse>(endpoint);
-    
+
     // Return the results array from the paginated response
     return response.data.results;
   },
@@ -102,6 +102,24 @@ export const branchAPI = {
   // Get branch statistics
   stats: async (id: string | number): Promise<BranchStats> => {
     const response = await api.get(`/branch/branches/${id}/stats/`);
+    return response.data;
+  },
+
+  // Get overall branch performance
+  getOverallPerformance: async (range: string = '7d'): Promise<any[]> => {
+    const response = await api.get(`/branch/branches/performance/overall/?range=${range}`);
+    return response.data;
+  },
+
+  // Get specific branch performance history
+  getBranchPerformance: async (id: string | number, range: string = '6m'): Promise<any[]> => {
+    const response = await api.get(`/branch/branches/${id}/performance/?range=${range}`);
+    return response.data;
+  },
+
+  // Get specific branch expense breakdown
+  getExpenseBreakdown: async (id: string | number, range: string = '1m'): Promise<any[]> => {
+    const response = await api.get(`/branch/branches/${id}/expenses/breakdown/?range=${range}`);
     return response.data;
   },
 };

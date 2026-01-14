@@ -29,6 +29,7 @@ class User(AbstractUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=False)
+    is_vip = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     date_joined = models.DateTimeField(auto_now_add=True)
     last_login = models.DateTimeField(auto_now=True)
@@ -38,6 +39,16 @@ class User(AbstractUser, PermissionsMixin):
     REQUIRED_FIELDS = ['first_name', 'last_name', 'phone']
 
     objects = UserManager()
+
+    def save(self, *args, **kwargs):
+        """Override save to automatically set is_staff based on role."""
+        # Set is_staff=True for admin and branch_manager roles
+        if self.role in [Role.ADMIN, Role.BRANCH_MANAGER]:
+            self.is_staff = True
+        # Set is_superuser=True for admin role
+        if self.role == Role.ADMIN:
+            self.is_superuser = True
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """Returns the string representation of the user."""
