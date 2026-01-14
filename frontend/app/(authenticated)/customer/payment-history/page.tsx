@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { FaHistory, FaChevronLeft, FaChevronRight, FaSearch } from "react-icons/fa";
+import { FaHistory, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { PaymentService, PaymentData } from "../../../services/paymentService";
 import "../../../types/i18n";
 
@@ -14,11 +14,8 @@ export default function PaymentHistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const pageSize = 10;
 
-  useEffect(() => {
-    fetchPayments();
-  }, [currentPage]);
-
-  const fetchPayments = async () => {
+  const handleFetchPayments = useCallback(async () => {
+    if (!currentPage) return;
     try {
       setIsLoading(true);
       setError(null);
@@ -39,7 +36,13 @@ export default function PaymentHistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, pageSize]);
+
+  useEffect(() => {
+    handleFetchPayments();
+  }, [handleFetchPayments]);
+
+
 
   const getStatusBadge = (status: string) => {
     const baseClass = "px-2.5 py-0.5 rounded-full text-xs font-semibold";
@@ -77,7 +80,7 @@ export default function PaymentHistoryPage() {
               {error}
             </div>
             <button
-              onClick={fetchPayments}
+              onClick={handleFetchPayments}
               className="block mx-auto px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm font-medium"
             >
               Retry

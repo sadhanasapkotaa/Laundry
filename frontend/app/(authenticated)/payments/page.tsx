@@ -1,19 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import "../../types/i18n";
 import { useTranslation } from 'react-i18next';
 import {
-  FiBell,
   FiCheckCircle,
   FiXCircle,
   FiClock,
-  FiUser,
   FiSearch,
-  FiFilter,
   FiPlus,
   FiRefreshCw,
-  FiDownload,
   FiEye,
   FiCreditCard,
   FiDollarSign,
@@ -133,7 +129,7 @@ const PaymentsPage: React.FC = () => {
   });
 
   // Load payment history
-  const loadPaymentHistory = async (showLoader = false) => {
+  const loadPaymentHistory = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
 
     try {
@@ -165,12 +161,12 @@ const PaymentsPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [filters]);
 
   // Effects
   useEffect(() => {
     loadPaymentHistory(true);
-  }, [filters]);
+  }, [loadPaymentHistory]);
 
   // Handlers
   const handleFilterChange = (key: keyof PaymentFilters, value: string | number) => {

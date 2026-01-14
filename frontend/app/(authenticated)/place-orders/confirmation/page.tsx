@@ -7,8 +7,8 @@ import { FaCheckCircle, FaHome, FaClipboardList, FaDownload, FaCreditCard, FaClo
 export default function ConfirmationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  const [orderDetails, setOrderDetails] = useState({
+
+  const [orderDetails] = useState({
     orderId: searchParams.get('orderId') || '',
     paymentMethod: searchParams.get('paymentMethod') || '',
     paymentRef: searchParams.get('paymentRef') || '',
@@ -18,7 +18,7 @@ export default function ConfirmationPage() {
   useEffect(() => {
     // Clear any remaining order data from localStorage
     localStorage.removeItem('orderData');
-    
+
     // If no order ID is provided, redirect to orders page
     if (!orderDetails.orderId) {
       router.push('/place-orders');
@@ -186,7 +186,7 @@ export default function ConfirmationPage() {
               <FaHome />
               Back to Home
             </button>
-            
+
             <button
               onClick={goToOrders}
               className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition-colors"
@@ -194,7 +194,7 @@ export default function ConfirmationPage() {
               <FaClipboardList />
               View Orders
             </button>
-            
+
             <button
               onClick={printOrder}
               className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-lg font-medium transition-colors"

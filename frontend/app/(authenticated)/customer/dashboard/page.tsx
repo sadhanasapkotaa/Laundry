@@ -75,7 +75,7 @@ export default function CustomerDashboardPage() {
             Hello, <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">{user?.first_name || 'User'}</span>
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-2">
-            Here's what's happening with your laundry today.
+            Here&apos;s what&apos;s happening with your laundry today.
           </p>
         </div>
         <Link href="/customer/place-order" className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 flex items-center gap-2">
@@ -165,13 +165,13 @@ export default function CustomerDashboardPage() {
                         <div className="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
                           <span>{order.created ? new Date(order.created).toLocaleDateString() : order.order_date}</span>
                           <span>•</span>
-                          <span>{order.service_type || 'Standard Service'}</span>
+                          <span>{order.services?.[0]?.service_type || 'Standard Service'}</span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize
-                                            ${order.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                            ${(order.status === 'delivered' || order.status === 'picked by client') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                           order.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                             'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                         }`}>

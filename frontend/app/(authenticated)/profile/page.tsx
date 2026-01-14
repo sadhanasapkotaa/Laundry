@@ -32,6 +32,11 @@ export default function StaffProfilePage() {
     confirm: "",
   });
 
+  // Password change hooks - MUST be declared before early returns
+  const { mutate: changePassword, isPending: isChangingPassword } = useChangePassword();
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
   // Sync form state when user data changes
   useEffect(() => {
     if (user && !editMode) {
@@ -80,10 +85,6 @@ export default function StaffProfilePage() {
       },
     });
   };
-
-  const { mutate: changePassword, isPending: isChangingPassword } = useChangePassword();
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPasswords({ ...passwords, [e.target.name]: e.target.value });

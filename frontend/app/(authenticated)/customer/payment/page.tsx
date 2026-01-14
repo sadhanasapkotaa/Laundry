@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FaCreditCard, FaHistory, FaChevronLeft, FaChevronRight, FaSpinner, FaRegCreditCard } from "react-icons/fa";
+import { FaCreditCard, FaHistory, FaChevronRight, FaSpinner, FaRegCreditCard } from "react-icons/fa";
 import { branchAPI, Branch } from "../../../services/branchService";
 import { orderAPI, OrderStats } from "../../../services/orderService";
 import { PaymentService, PaymentData } from "../../../services/paymentService";
 
 export default function CustomerPaymentPage() {
     const [stats, setStats] = useState<OrderStats['stats'] | null>(null);
-    const [pendingOrders, setPendingOrders] = useState<OrderStats['pending_orders']>([]);
     const [branchPendingAmounts, setBranchPendingAmounts] = useState<OrderStats['branch_pending_amounts']>([]);
     const [payments, setPayments] = useState<PaymentData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -22,8 +21,6 @@ export default function CustomerPaymentPage() {
     const [idempotencyKey, setIdempotencyKey] = useState<string>("");
 
     // Pagination for payment history
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
     const pageSize = 10;
 
     // Generate idempotency key on mount
@@ -43,41 +40,43 @@ export default function CustomerPaymentPage() {
             localStorage.removeItem('paymentSuccess');
             console.log('[Payment Page] Detected successful payment, refreshing data...');
         }
+
+        const fetchData = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+
+                // Fetch stats from backend and payment history in parallel
+                // Use page 1 since pagination is not implemented in this view
+                const [statsResponse, paymentsResponse, branchesResponse] = await Promise.all([
+                    orderAPI.getStats(),
+                    PaymentService.getPaymentHistory({ page: 1, page_size: pageSize }),
+                    branchAPI.list({ status: 'active' }),
+                ]);
+
+                setBranches(branchesResponse);
+                if (branchesResponse.length > 0) {
+                    setSelectedBranch(branchesResponse[0].id);
+                }
+
+                if (statsResponse.success) {
+                    setStats(statsResponse.stats);
+                    setBranchPendingAmounts(statsResponse.branch_pending_amounts || []);
+                }
+
+                setPayments(paymentsResponse.payments || []);
+            } catch (err) {
+                console.error('Error fetching payment data:', err);
+                setError('Failed to load payment data');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         fetchData();
-    }, [currentPage]);
+    }, []);
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
 
-            // Fetch stats from backend and payment history in parallel
-            const [statsResponse, paymentsResponse, branchesResponse] = await Promise.all([
-                orderAPI.getStats(),
-                PaymentService.getPaymentHistory({ page: currentPage, page_size: pageSize }),
-                branchAPI.list({ status: 'active' }),
-            ]);
-
-            setBranches(branchesResponse);
-            if (branchesResponse.length > 0) {
-                setSelectedBranch(branchesResponse[0].id);
-            }
-
-            if (statsResponse.success) {
-                setStats(statsResponse.stats);
-                setPendingOrders(statsResponse.pending_orders || []);
-                setBranchPendingAmounts(statsResponse.branch_pending_amounts || []);
-            }
-
-            setPayments(paymentsResponse.payments || []);
-            setTotalPages(paymentsResponse.pagination?.total_pages || 1);
-        } catch (err) {
-            console.error('Error fetching payment data:', err);
-            setError('Failed to load payment data');
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     // Get pending amount from backend stats
     const totalPendingAmount = stats?.pending_amount || 0;

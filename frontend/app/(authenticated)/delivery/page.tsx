@@ -3,7 +3,7 @@
 import "../../types/i18n";
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { FiMapPin, FiClock, FiPackage, FiPhone, FiRefreshCw, FiCheckCircle, FiTruck, FiCalendar, FiArrowRight } from "react-icons/fi";
+import { FiMapPin, FiPackage, FiPhone, FiRefreshCw, FiTruck, FiCalendar } from "react-icons/fi";
 import { deliveryAPI, Delivery } from "../../services/deliveryService";
 import { useAuth } from "../../contexts/AuthContext";
 import dynamic from "next/dynamic";
@@ -30,7 +30,7 @@ const TIME_SLOT_LABELS: Record<string, string> = {
 
 export default function DeliveryDashboard() {
     const { t } = useTranslation();
-    const { user } = useAuth();
+    const { user: _ } = useAuth();
     const [deliveries, setDeliveries] = useState<Delivery[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -75,10 +75,7 @@ export default function DeliveryDashboard() {
         }
     };
 
-    const getMapLink = (address: string, link?: string) => {
-        if (link) return link;
-        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    };
+
 
     // Helper to format date
     const isToday = (dateString: string) => {
@@ -155,7 +152,7 @@ export default function DeliveryDashboard() {
                 {/* Map Section */}
                 <div className="lg:col-span-2 space-y-4">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <FiMapPin /> Today's Route
+                        <FiMapPin /> Today&apos;s Route
                     </h2>
                     <div className="h-[400px] bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shadow-inner">
                         {todayDeliveries.length > 0 ? (
@@ -193,7 +190,7 @@ export default function DeliveryDashboard() {
             <hr className="border-gray-200 dark:border-gray-700" />
 
             {/* TODAY'S TASKS LISTS */}
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4">Today's Tasks</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4">Today&apos;s Tasks</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* PICKUPS COLUMN */}
@@ -275,8 +272,7 @@ export default function DeliveryDashboard() {
 }
 
 // Sub-component for individual Task Cards
-const TaskCard = ({ delivery, onStatusUpdate, type }: { delivery: Delivery, onStatusUpdate: (id: number, status: any) => void, type: 'pickup' | 'drop' }) => {
-    const { t } = useTranslation();
+const TaskCard = ({ delivery, onStatusUpdate, type }: { delivery: Delivery, onStatusUpdate: (id: number, status: 'in_progress' | 'delivered') => void, type: 'pickup' | 'drop' }) => {
 
     // Branch info display logic
     // Pickup: From User -> To Branch
@@ -306,7 +302,7 @@ const TaskCard = ({ delivery, onStatusUpdate, type }: { delivery: Delivery, onSt
                         {delivery.delivery_contact || delivery.customer_phone || "No Phone"}
                     </a>
                 </div>
-            </div> 
+            </div>
 
             <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-sm space-y-2 mb-3">
                 <div className="flex items-start gap-2">

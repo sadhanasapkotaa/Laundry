@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FaCheckCircle, FaReceipt, FaDownload, FaPrint } from "react-icons/fa";
-import { PaymentService } from "../../../../services/paymentService";
+
 import { apiRequest, API_CONFIG } from "../../../../config/api";
 
 interface OrderPaid {

@@ -17,7 +17,6 @@ export default function ServicesSettingsPage() {
     const [success, setSuccess] = useState<string | null>(null);
 
     // Data states
-    const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [washTypes, setWashTypes] = useState<WashType[]>([]);
     const [clothNames, setClothNames] = useState<ClothName[]>([]);
     const [clothTypes, setClothTypes] = useState<ClothType[]>([]);
@@ -39,7 +38,7 @@ export default function ServicesSettingsPage() {
                 clothTypeAPI.list(),
                 pricingRuleAPI.list()
             ]);
-            setSettings(settingsData);
+
             setEditingSettings({
                 pickup_cost: settingsData.pickup_cost,
                 delivery_cost: settingsData.delivery_cost,
@@ -70,11 +69,10 @@ export default function ServicesSettingsPage() {
     const saveSettings = async () => {
         setSaving(true);
         try {
-            const updated = await settingsAPI.update(editingSettings);
-            setSettings(updated);
+            await settingsAPI.update(editingSettings);
+
             showSuccess("Settings saved successfully!");
-        } catch (err) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch {
             setError("Failed to save settings");
         } finally {
             setSaving(false);
@@ -91,8 +89,7 @@ export default function ServicesSettingsPage() {
             setNewItem({ name: '', description: '' });
             showSuccess(`${type.replace('-', ' ')} added successfully!`);
             fetchData();
-        } catch (err) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch {
             setError(`Failed to add ${type}`);
         } finally {
             setSaving(false);
@@ -107,8 +104,7 @@ export default function ServicesSettingsPage() {
             await api.delete(id);
             showSuccess("Item deleted successfully!");
             fetchData();
-        } catch (err) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch {
             setError("Failed to delete item");
         }
     };
@@ -131,8 +127,7 @@ export default function ServicesSettingsPage() {
             setNewPricing({ wash_type: 0, cloth_name: 0, cloth_type: 0, price: '' });
             showSuccess("Pricing rule added successfully!");
             fetchData();
-        } catch (err) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch {
             setError("Failed to add pricing rule. It may already exist.");
         } finally {
             setSaving(false);
@@ -146,8 +141,7 @@ export default function ServicesSettingsPage() {
             await pricingRuleAPI.delete(id);
             showSuccess("Pricing rule deleted!");
             fetchData();
-        } catch (err) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch {
             setError("Failed to delete pricing rule");
         }
     };
@@ -198,8 +192,8 @@ export default function ServicesSettingsPage() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as TabType)}
                             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             <tab.icon size={16} />

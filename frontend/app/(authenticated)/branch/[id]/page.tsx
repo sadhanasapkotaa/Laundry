@@ -1,7 +1,7 @@
 "use client";
 
 import "../../../types/auth";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from "next/navigation";
 import {
   FaArrowLeft,
@@ -46,21 +46,11 @@ const BranchDetail = () => {
   const [user] = useState<User>({ role: 'admin' });
 
   // Real Data State
-  const [performanceData, setPerformanceData] = useState<any[]>([]);
-  const [expenseBreakdown, setExpenseBreakdown] = useState<any[]>([]);
-  const [chartRange, setChartRange] = useState('6m');
+  const [performanceData, setPerformanceData] = useState<Array<{ date: string; orders: number; income: number }>>([]);
+  const [expenseBreakdown, setExpenseBreakdown] = useState<Array<{ category: string; amount: number; color?: string }>>([]);
+  const [chartRange] = useState('7d');
 
-  useEffect(() => {
-    fetchBranchData();
-  }, [branchId]);
-
-  useEffect(() => {
-    if (branchId) {
-      fetchCharts();
-    }
-  }, [branchId, chartRange]);
-
-  const fetchBranchData = async () => {
+  const fetchBranchData = useCallback(async () => {
     try {
       setLoading(true);
       const fetchedBranch = await branchAPI.detail(branchId);
@@ -72,9 +62,9 @@ const BranchDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [branchId, setBranch, setLoading]);
 
-  const fetchCharts = async () => {
+  const fetchCharts = useCallback(async () => {
     try {
       const [perfData, expData] = await Promise.all([
         branchAPI.getBranchPerformance(branchId, chartRange),
@@ -85,7 +75,18 @@ const BranchDetail = () => {
     } catch (error) {
       console.error("Error fetching charts:", error);
     }
-  };
+  }, [branchId, chartRange, setPerformanceData, setExpenseBreakdown]);
+
+  useEffect(() => {
+    fetchBranchData();
+  }, [fetchBranchData]);
+
+  useEffect(() => {
+    if (branchId) {
+      fetchCharts();
+    }
+  }, [branchId, chartRange, fetchCharts]);
+
 
   const handleEdit = () => {
     router.push(`/branch/${branchId}/edit`);

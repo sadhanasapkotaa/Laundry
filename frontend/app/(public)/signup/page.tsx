@@ -179,17 +179,21 @@ const SignupPage = () => {
                     Registration failed
                   </h3>
                   <div className="mt-2 text-sm text-red-700">
-                    {error.response?.data && typeof error.response.data === 'object' ? (
-                      <ul className="list-disc list-inside space-y-1">
-                        {Object.entries(error.response.data).map(([field, messages]) => (
-                          <li key={field}>
-                            {Array.isArray(messages) ? messages.join(' ') : String(messages)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p>{error.message || 'Please check your information and try again.'}</p>
-                    )}
+                    {(() => {
+                      const err = error as { response?: { data?: Record<string, unknown> }; message?: string };
+                      if (err?.response?.data && typeof err.response.data === 'object') {
+                        return (
+                          <ul className="list-disc list-inside space-y-1">
+                            {Object.entries(err.response.data).map(([field, messages]) => (
+                              <li key={field}>
+                                {Array.isArray(messages) ? messages.join(' ') : String(messages)}
+                              </li>
+                            ))}
+                          </ul>
+                        );
+                      }
+                      return <p>{err?.message || 'Please check your information and try again.'}</p>;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -217,8 +221,8 @@ const SignupPage = () => {
             </div>
           </div>
         </form>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 

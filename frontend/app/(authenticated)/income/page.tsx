@@ -10,7 +10,6 @@ import {
   FaCreditCard,
   FaMoneyBillWave,
   FaChartLine,
-  FaFilter,
   FaDownload,
 } from "react-icons/fa6";
 import {
@@ -73,14 +72,14 @@ interface TimeSeriesData {
 
 const IncomeTracking = () => {
   const { t } = useTranslation();
-  
+
   const [incomeRecords, setIncomeRecords] = useState<Income[]>([]);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [selectedBranch, setSelectedBranch] = useState<string>('');
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<Array<{ id: number; name: string }>>([]);
 
   // Fetch branches
   useEffect(() => {
@@ -111,11 +110,11 @@ const IncomeTracking = () => {
         if (selectedBranch) {
           statsUrl.searchParams.append('branch', selectedBranch);
         }
-        
+
         const statsResponse = await fetch(statsUrl.toString(), {
           headers: getAuthHeaders(),
         });
-        
+
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
           setStatistics(statsData);
@@ -127,11 +126,11 @@ const IncomeTracking = () => {
         if (selectedBranch) {
           timeUrl.searchParams.append('branch', selectedBranch);
         }
-        
+
         const timeResponse = await fetch(timeUrl.toString(), {
           headers: getAuthHeaders(),
         });
-        
+
         if (timeResponse.ok) {
           const timeData = await timeResponse.json();
           setTimeSeriesData(timeData);
@@ -143,11 +142,11 @@ const IncomeTracking = () => {
           incomeUrl.searchParams.append('branch', selectedBranch);
         }
         incomeUrl.searchParams.append('page_size', '10');
-        
+
         const incomeResponse = await fetch(incomeUrl.toString(), {
           headers: getAuthHeaders(),
         });
-        
+
         if (incomeResponse.ok) {
           const incomeData = await incomeResponse.json();
           setIncomeRecords(incomeData.results || incomeData);
@@ -171,10 +170,10 @@ const IncomeTracking = () => {
   // Prepare payment method chart data
   const paymentMethodData = statistics?.payment_methods
     ? Object.entries(statistics.payment_methods).map(([method, value]) => ({
-        name: method === 'cash' ? 'Cash' : method === 'esewa' ? 'eSewa' : 'Bank',
-        value: value,
-        color: method === 'cash' ? '#10B981' : method === 'esewa' ? '#3B82F6' : '#F59E0B',
-      }))
+      name: method === 'cash' ? 'Cash' : method === 'esewa' ? 'eSewa' : 'Bank',
+      value: value,
+      color: method === 'cash' ? '#10B981' : method === 'esewa' ? '#3B82F6' : '#F59E0B',
+    }))
     : [];
 
   // Prepare chart data for time series
@@ -214,7 +213,7 @@ const IncomeTracking = () => {
     <div className="space-y-6 p-4 md:p-6 pt-16 md:pt-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold">{t("income.title")}</h1>
-        
+
         {/* Filters */}
         <div className="flex flex-wrap gap-3">
           <select
@@ -235,11 +234,10 @@ const IncomeTracking = () => {
               <button
                 key={period}
                 onClick={() => setSelectedPeriod(period)}
-                className={`px-4 py-1 rounded-md transition-colors ${
-                  selectedPeriod === period
+                className={`px-4 py-1 rounded-md transition-colors ${selectedPeriod === period
                     ? 'bg-blue-500 text-white'
                     : 'hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 {period.charAt(0).toUpperCase() + period.slice(1)}
               </button>
@@ -330,7 +328,7 @@ const IncomeTracking = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -347,7 +345,7 @@ const IncomeTracking = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Bar dataKey="income" fill="#3B82F6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -399,13 +397,12 @@ const IncomeTracking = () => {
                     <td className="py-3">
                       {record.payment_reference ? (
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                            record.payment_reference.payment_type === 'cash'
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${record.payment_reference.payment_type === 'cash'
                               ? 'bg-green-100 text-green-800'
                               : record.payment_reference.payment_type === 'esewa'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}
                         >
                           {record.payment_reference.payment_type === 'cash' ? (
                             <FaMoneyBillWave />

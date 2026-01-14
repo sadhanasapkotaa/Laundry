@@ -1,13 +1,13 @@
 "use client";
 
 import React, { Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { FaCheckCircle, FaHome, FaListAlt } from "react-icons/fa";
 import Link from "next/link";
 
 function ConfirmationContent() {
     const searchParams = useSearchParams();
-    const router = useRouter();
+    // const router = useRouter(); // Unused
 
     const orderId = searchParams.get('orderId');
     const paymentMethod = searchParams.get('paymentMethod');

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt, FaPlus, FaSave, FaStore, FaClock, FaCalendar, FaMinus } from "react-icons/fa";
+import { FaTshirt, FaBox, FaTrash, FaShoppingCart, FaMapMarkerAlt, FaPlus, FaStore, FaClock, FaCalendar, FaMinus } from "react-icons/fa";
 import { branchAPI, Branch } from "../../../services/branchService";
 import { addressAPI, UserAddress } from "../../../services/addressService";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -185,10 +185,10 @@ export default function CustomerPlaceOrderPage() {
         try {
           // First try to find in cached pricing rules
           const cachedRule = pricingRules.find(
-            r => r.wash_type === selectedWashType && 
-                 r.cloth_name === selectedClothName && 
-                 r.cloth_type === selectedClothType &&
-                 r.is_active
+            r => r.wash_type === selectedWashType &&
+              r.cloth_name === selectedClothName &&
+              r.cloth_type === selectedClothType &&
+              r.is_active
           );
           if (cachedRule) {
             setCurrentPrice(parseFloat(cachedRule.price));

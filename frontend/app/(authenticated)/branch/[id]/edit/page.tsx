@@ -24,7 +24,7 @@ const EditBranch = () => {
   const router = useRouter();
   const params = useParams();
   const branchId = params.id as string;
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Partial<BranchFormData>>({});
@@ -42,32 +42,33 @@ const EditBranch = () => {
   });
 
   useEffect(() => {
+    const fetchBranch = async () => {
+      try {
+        setLoading(true);
+        const branch = await branchAPI.detail(branchId);
+        setFormData({
+          name: branch.name,
+          address: branch.address,
+          city: branch.city,
+          map_link: branch.map_link,
+          phone: branch.phone,
+          email: branch.email,
+          branch_manager: branch.branch_manager,
+          status: branch.status,
+          opening_date: branch.opening_date,
+        });
+      } catch (error: unknown) {
+        console.error('Error fetching branch:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Error fetching branch: ${errorMessage}`);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchBranch();
   }, [branchId]);
 
-  const fetchBranch = async () => {
-    try {
-      setLoading(true);
-      const branch = await branchAPI.detail(branchId);
-      setFormData({
-        name: branch.name,
-        address: branch.address,
-        city: branch.city,
-        map_link: branch.map_link,
-        phone: branch.phone,
-        email: branch.email,
-        branch_manager: branch.branch_manager,
-        status: branch.status,
-        opening_date: branch.opening_date,
-      });
-    } catch (error: unknown) {
-      console.error('Error fetching branch:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Error fetching branch: ${errorMessage}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -86,7 +87,7 @@ const EditBranch = () => {
       address,
       map_link: mapLink,
     }));
-    
+
     // Clear address error if it exists
     if (errors.address) {
       setErrors((prev) => ({ ...prev, address: "" }));
@@ -122,7 +123,7 @@ const EditBranch = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -173,7 +174,7 @@ const EditBranch = () => {
             <FaBuilding className="text-blue-600" />
             <h2 className="text-xl font-semibold">Branch Information</h2>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -186,9 +187,8 @@ const EditBranch = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Enter branch name"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.name ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.name ? "border-red-500" : "border-gray-300"
+                  }`}
               />
               {errors.name && (
                 <p className="text-red-500 text-sm mt-1">{errors.name}</p>
@@ -222,9 +222,8 @@ const EditBranch = () => {
                 value={formData.city}
                 onChange={handleInputChange}
                 placeholder="Enter city"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.city ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city ? "border-red-500" : "border-gray-300"
+                  }`}
               />
               {errors.city && (
                 <p className="text-red-500 text-sm mt-1">{errors.city}</p>
@@ -242,9 +241,8 @@ const EditBranch = () => {
                 value={formData.phone}
                 onChange={handleInputChange}
                 placeholder="+977-1-4567890"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.phone ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.phone ? "border-red-500" : "border-gray-300"
+                  }`}
               />
               {errors.phone && (
                 <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
@@ -262,9 +260,8 @@ const EditBranch = () => {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="branch@example.com"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.email ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? "border-red-500" : "border-gray-300"
+                  }`}
               />
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -281,9 +278,8 @@ const EditBranch = () => {
                 name="opening_date"
                 value={formData.opening_date}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.opening_date ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.opening_date ? "border-red-500" : "border-gray-300"
+                  }`}
               />
               {errors.opening_date && (
                 <p className="text-red-500 text-sm mt-1">{errors.opening_date}</p>
@@ -314,7 +310,7 @@ const EditBranch = () => {
             <FaUser className="text-green-600" />
             <h2 className="text-xl font-semibold">Manager Information</h2>
           </div>
-          
+
           <div className="grid grid-cols-1 gap-6">
             <div>
               <label htmlFor="branch_manager" className="block text-sm font-medium text-gray-700 mb-2">
@@ -327,9 +323,8 @@ const EditBranch = () => {
                 value={formData.branch_manager}
                 onChange={handleInputChange}
                 placeholder="Enter manager name"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.branch_manager ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.branch_manager ? "border-red-500" : "border-gray-300"
+                  }`}
               />
               {errors.branch_manager && (
                 <p className="text-red-500 text-sm mt-1">{errors.branch_manager}</p>

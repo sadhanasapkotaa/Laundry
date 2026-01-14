@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { FaShoppingCart, FaMapMarkerAlt, FaClock, FaArrowLeft, FaCheck, FaSpinner, FaMoneyBillWave, FaCreditCard, FaUniversity } from "react-icons/fa";
+import { FaShoppingCart, FaMapMarkerAlt, FaArrowLeft, FaCheck, FaSpinner, FaMoneyBillWave, FaCreditCard, FaUniversity } from "react-icons/fa";
 import { orderAPI } from "../../../../services/orderService";
 import PaymentService from "../../../../services/paymentService";
 import { useAuth } from "../../../../contexts/AuthContext";
@@ -58,70 +58,14 @@ interface OrderData {
 
 export default function CustomerCheckoutPage() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user: _ } = useAuth();
 
     const [orderData, setOrderData] = useState<OrderData | null>(null);
     const [selectedPayment, setSelectedPayment] = useState<"esewa" | "bank" | "cod" | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [orderNotes, setOrderNotes] = useState("");
 
-    useEffect(() => {
-        // Check for eSewa payment return FIRST (before checking localStorage)
-        const urlParams = new URLSearchParams(window.location.search);
-        const dataParam = urlParams.get('data');
-        const failureReason = urlParams.get('failure_reason') || urlParams.get('error');
-
-        if (dataParam || failureReason) {
-            checkEsewaReturn();
-            return;
-        }
-
-        // Load order data from localStorage
-        const storedOrderData = localStorage.getItem('customerOrderData');
-        if (storedOrderData) {
-            try {
-                const parsedData = JSON.parse(storedOrderData);
-                setOrderData(parsedData);
-            } catch (error) {
-                console.error('Error parsing order data:', error);
-                router.push('/customer/place-order');
-            }
-        } else {
-            router.push('/customer/place-order');
-        }
-    }, [router]);
-
-    const checkEsewaReturn = () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const failureReason = urlParams.get('failure_reason') || urlParams.get('error');
-
-        if (failureReason) {
-            router.push(`/customer/place-order/failure?reason=eSewa payment failed: ${failureReason}`);
-            return;
-        }
-
-        const dataParam = urlParams.get('data');
-
-        if (dataParam) {
-            try {
-                const decodedData = atob(dataParam);
-                const paymentData = JSON.parse(decodedData);
-                const { transaction_code, status, total_amount, transaction_uuid } = paymentData;
-
-                if (status === 'COMPLETE') {
-                    handleEsewaSuccess(transaction_uuid, transaction_code, parseFloat(total_amount));
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                } else {
-                    router.push(`/customer/place-order/failure?reason=eSewa payment status: ${status}`);
-                }
-            } catch (error) {
-                console.error('Error parsing eSewa payment data:', error);
-                router.push(`/customer/place-order/failure?reason=Failed to parse payment response`);
-            }
-        }
-    };
-
-    const handleEsewaSuccess = async (transactionUuid: string, transactionCode: string, amount: number) => {
+    const handleEsewaSuccess = useCallback(async (transactionUuid: string, transactionCode: string, amount: number) => {
         try {
             setIsProcessing(true);
             const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
@@ -151,11 +95,68 @@ export default function CustomerCheckoutPage() {
             router.push(`/customer/orders/success?transaction_uuid=${encodedTransactionUuid}`);
         } catch (error) {
             console.error('Error processing eSewa success:', error);
-            router.push(`/customer/orders/failure?reason=Payment processing failed: ${encodeURIComponent(error instanceof Error ? error.message : String(error))}`);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            router.push(`/customer/orders/failure?reason=Payment processing failed: ${encodeURIComponent(errorMessage)}`);
         } finally {
             setIsProcessing(false);
         }
-    };
+    }, [router]);
+
+    const checkEsewaReturn = useCallback(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const failureReason = urlParams.get('failure_reason') || urlParams.get('error');
+
+        if (failureReason) {
+            router.push(`/customer/place-order/failure?reason=eSewa payment failed: ${failureReason}`);
+            return;
+        }
+
+        const dataParam = urlParams.get('data');
+
+        if (dataParam) {
+            try {
+                const decodedData = atob(dataParam);
+                const paymentData = JSON.parse(decodedData);
+                const { transaction_code, status, total_amount, transaction_uuid } = paymentData;
+
+                if (status === 'COMPLETE') {
+                    handleEsewaSuccess(transaction_uuid, transaction_code, parseFloat(total_amount));
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    router.push(`/customer/place-order/failure?reason=eSewa payment status: ${status}`);
+                }
+            } catch (error) {
+                console.error('Error parsing eSewa payment data:', error);
+                router.push(`/customer/place-order/failure?reason=Failed to parse payment response`);
+            }
+        }
+    }, [handleEsewaSuccess, router]);
+
+    useEffect(() => {
+        // Check for eSewa payment return FIRST (before checking localStorage)
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataParam = urlParams.get('data');
+        const failureReason = urlParams.get('failure_reason') || urlParams.get('error');
+
+        if (dataParam || failureReason) {
+            checkEsewaReturn();
+            return;
+        }
+
+        // Load order data from localStorage
+        const storedOrderData = localStorage.getItem('customerOrderData');
+        if (storedOrderData) {
+            try {
+                const parsedData = JSON.parse(storedOrderData);
+                setOrderData(parsedData);
+            } catch (error) {
+                console.error('Error parsing order data:', error);
+                router.push('/customer/place-order');
+            }
+        } else {
+            router.push('/customer/place-order');
+        }
+    }, [router, checkEsewaReturn]);
 
     const createOrder = async (data: OrderData, paymentMethod: string, status: string, paymentRef?: string) => {
         try {
@@ -211,26 +212,40 @@ export default function CustomerCheckoutPage() {
 
         try {
             setIsProcessing(true);
+            // Construct the order object as expected by the backend
+            const orderPayload = {
+                branch: orderData.branch,
+                services: orderData.cart.map(item => ({
+                    service_type: item.clothName,
+                    wash_type: item.washTypeName,
+                    material: item.material,
+                    quantity: item.quantity,
+                    pricing_type: item.clothType,
+                    price_per_unit: item.unitPrice,
+                    total_price: item.price,
+                })),
+                pickup_enabled: orderData.services.pickupEnabled,
+                delivery_enabled: orderData.services.deliveryEnabled,
+                pickup_date: orderData.pickup?.date,
+                pickup_time: orderData.pickup?.time,
+                pickup_address: orderData.pickup?.address,
+                pickup_map_link: orderData.pickup?.map_link,
+                delivery_date: orderData.delivery?.date,
+                delivery_time: orderData.delivery?.time,
+                delivery_address: orderData.delivery?.address,
+                delivery_map_link: orderData.delivery?.map_link,
+                is_urgent: orderData.services.isUrgent,
+                total_amount: orderData.pricing.total,
+                payment_method: 'esewa',
+                description: orderNotes,
+            };
+
             const paymentResponse = await PaymentService.initiatePayment({
                 payment_type: "esewa",
                 amount: orderData.pricing.total,
                 branch_id: orderData.branch,
                 payment_source: 'order',
-                order_data: {
-                    ...orderData,
-                    pickup_date: orderData.pickup?.date,
-                    pickup_time: orderData.pickup?.time,
-                    pickup_address: orderData.pickup?.address,
-                    pickup_map_link: orderData.pickup?.map_link,
-                    delivery_date: orderData.delivery?.date,
-                    delivery_time: orderData.delivery?.time,
-                    delivery_address: orderData.delivery?.address,
-                    delivery_map_link: orderData.delivery?.map_link,
-                    is_urgent: orderData.services.isUrgent,
-                    total_amount: orderData.pricing.total,
-                    payment_method: 'esewa',
-                    description: orderNotes,
-                } as any, // Type assertion as partial mapping
+                order_data: orderPayload, // Use the constructed payload
             });
 
             if (paymentResponse.success && paymentResponse.payment_data && paymentResponse.esewa_url) {
@@ -253,7 +268,7 @@ export default function CustomerCheckoutPage() {
 
         try {
             setIsProcessing(true);
-            const order = await createOrder(orderData, 'bank', 'pending');
+            await createOrder(orderData, 'bank', 'pending');
             localStorage.removeItem('customerOrderData');
 
             // Custom simplified logic for demo/MVP - typically would redirect to a specific success/instruction page
@@ -280,7 +295,7 @@ export default function CustomerCheckoutPage() {
 
         try {
             setIsProcessing(true);
-            const order = await createOrder(orderData, 'cod', 'pending');
+            await createOrder(orderData, 'cod', 'pending');
             localStorage.removeItem('customerOrderData');
             router.push(`/customer/orders`); // Redirect to orders list
         } catch (error) {
@@ -406,8 +421,8 @@ export default function CustomerCheckoutPage() {
                                 onClick={() => handlePaymentSelection("esewa")}
                                 disabled={isProcessing}
                                 className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${selectedPayment === "esewa"
-                                        ? "border-green-500 bg-green-50/20"
-                                        : "border-gray-100 dark:border-gray-700 hover:border-green-200 dark:hover:border-green-900"
+                                    ? "border-green-500 bg-green-50/20"
+                                    : "border-gray-100 dark:border-gray-700 hover:border-green-200 dark:hover:border-green-900"
                                     }`}
                             >
                                 <div className="flex items-center gap-3">
@@ -426,8 +441,8 @@ export default function CustomerCheckoutPage() {
                                 onClick={() => handlePaymentSelection("cod")}
                                 disabled={isProcessing}
                                 className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${selectedPayment === "cod"
-                                        ? "border-blue-500 bg-blue-50/20"
-                                        : "border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-900"
+                                    ? "border-blue-500 bg-blue-50/20"
+                                    : "border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-900"
                                     }`}
                             >
                                 <div className="flex items-center gap-3">
@@ -445,8 +460,8 @@ export default function CustomerCheckoutPage() {
                                 onClick={() => handlePaymentSelection("bank")}
                                 disabled={isProcessing}
                                 className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${selectedPayment === "bank"
-                                        ? "border-purple-500 bg-purple-50/20"
-                                        : "border-gray-100 dark:border-gray-700 hover:border-purple-200 dark:hover:border-purple-900"
+                                    ? "border-purple-500 bg-purple-50/20"
+                                    : "border-gray-100 dark:border-gray-700 hover:border-purple-200 dark:hover:border-purple-900"
                                     }`}
                             >
                                 <div className="flex items-center gap-3">

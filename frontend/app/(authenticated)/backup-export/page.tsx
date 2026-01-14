@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { FiCalendar, FiDownload, FiDatabase, FiFileText, FiUsers, FiPackage, FiCreditCard, FiClock, FiCheckCircle } from "react-icons/fi";
+import { FiDownload, FiDatabase, FiFileText, FiUsers, FiPackage, FiCreditCard, FiClock, FiCheckCircle } from "react-icons/fi";
 
 interface ExportOption {
   id: string;
@@ -83,7 +83,7 @@ export default function BackupExport() {
       setDateRange("all");
       setCustomStartDate(undefined);
       setCustomEndDate(undefined);
-    } catch (error) {
+    } catch {
       alert("Export failed. Please try again.");
     } finally {
       setIsExporting(false);

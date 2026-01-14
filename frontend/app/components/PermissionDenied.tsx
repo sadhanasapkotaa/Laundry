@@ -3,7 +3,7 @@
 import { useAuth } from "../contexts/AuthContext";
 import { getDefaultRedirectPath } from "../config/permissions";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { FiShield, FiArrowLeft, FiHome } from "react-icons/fi";
 
 export default function PermissionDenied() {
@@ -14,14 +14,14 @@ export default function PermissionDenied() {
     router.back();
   };
 
-  const handleGoHome = () => {
+  const handleGoHome = useCallback(() => {
     if (user?.role) {
       const defaultPath = getDefaultRedirectPath(user.role);
       router.push(defaultPath);
     } else {
       router.push('/login');
     }
-  };
+  }, [user, router]);
 
   // Auto-redirect after 5 seconds
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function PermissionDenied() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [user]);
+  }, [handleGoHome]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
@@ -50,7 +50,7 @@ export default function PermissionDenied() {
           <p className="text-gray-600 dark:text-gray-400 mb-2">
             You don&apos;t have permission to access this page.
           </p>
-          
+
           {user?.role && (
             <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
               Your role: <span className="font-medium capitalize">{user.role.replace('_', ' ')}</span>
@@ -73,7 +73,7 @@ export default function PermissionDenied() {
               <FiArrowLeft className="w-4 h-4" />
               Go Back
             </button>
-            
+
             <button
               onClick={handleGoHome}
               className="flex items-center justify-center gap-2 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"

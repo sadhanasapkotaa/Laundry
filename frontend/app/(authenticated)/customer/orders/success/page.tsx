@@ -3,13 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FaCheckCircle, FaSpinner, FaReceipt, FaArrowRight } from "react-icons/fa";
-import { apiRequest, API_CONFIG } from "../../../../config/api";
+import { apiRequest } from "../../../../config/api";
+import { Order } from "../../../../services/orderService";
 
 export default function OrderPaymentSuccessPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isLoading, setIsLoading] = useState(true);
-    const [paymentData, setPaymentData] = useState<any>(null);
+    const [paymentData, setPaymentData] = useState<{
+        transaction_uuid?: string;
+        total_amount: number;
+        status?: string;
+        orders_paid?: Order[];
+        transaction_code?: string;
+        branch_name?: string;
+        payment_type?: string;
+        [key: string]: unknown
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -132,7 +142,7 @@ export default function OrderPaymentSuccessPage() {
                         <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                             <span className="text-gray-600 dark:text-gray-400">Payment Method:</span>
                             <span className="text-gray-900 dark:text-gray-100 capitalize">
-                                {paymentData.payment_type}
+                                {paymentData.payment_type as string}
                             </span>
                         </div>
                         <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">

@@ -21,24 +21,15 @@ import {
   FiPackage,
   FiDollarSign,
   FiTruck,
-  FiTrendingUp,
   FiUsers,
   FiShield,
   // FiBuilding,
 } from 'react-icons/fi';
 
 // ---------- Types ----------
-interface DailyOrdersItem {
-  day: string;
-  orders: number;
-  income: number;
-}
 
-interface ServiceSlice {
-  name: string;
-  value: number;
-  color: string;
-}
+
+
 
 interface BranchPerf {
   branch: string;
@@ -52,6 +43,12 @@ interface StatItem {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   change: string;
   changeType: 'positive' | 'negative' | 'neutral';
+}
+
+interface Activity {
+  action: string;
+  time: string;
+  [key: string]: unknown;
 }
 
 // ---------- Small UI primitives (Tailwind) ----------
@@ -87,9 +84,21 @@ const Dashboard: React.FC = () => {
 
   // Permission checks
   const canViewFinancials = usePermission('canViewFinancials');
-  const canViewAllOrders = usePermission('canViewAllOrders');
+  // const canViewAllOrders = usePermission('canViewAllOrders'); // Unused
   const canViewAllBranches = usePermission('canViewAllBranches');
   const canViewReports = usePermission('canViewReports');
+
+  // Dashboard State - MUST be declared before early returns
+  const [timeRange, setTimeRange] = useState('7d');
+  const [dashboardData, setDashboardData] = useState<{
+    chart_data?: Array<{ day: string; orders: number; income: number }>;
+    service_distribution?: Array<{ name: string; value: number }>;
+    branch_performance?: Array<{ branch: string; orders: number; income: number }>;
+    recent_activity?: Array<{ time: string;[key: string]: unknown }>;
+    stats?: { total_orders: number; total_income: number; active_orders: number };
+  } | null>(null);
+  const [loadingData, setLoadingData] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Set up date formatting on client side (must be before early returns)
   useEffect(() => {
@@ -104,7 +113,34 @@ const Dashboard: React.FC = () => {
     setDateLabel(formattedDate);
   }, [i18n?.language]);
 
-  // Loading state
+  // Fetch Dashboard Data - MUST be declared before early returns
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchDashboardData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, timeRange]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoadingData(true);
+      setError(null);
+      // Use the configured api instance which handles tokens
+      const response = await api.get(`/orders/stats/?range=${timeRange}`);
+      setDashboardData(response.data);
+    } catch (err: unknown) {
+      console.error("Failed to fetch dashboard data", err);
+      // Handle axios error
+      const errorMessage = (err as { response?: { data?: { detail?: string }; statusText?: string } }).response?.data?.detail ||
+        (err as { response?: { statusText?: string } }).response?.statusText ||
+        "Network or Server Error";
+      setError(`Failed to load data: ${errorMessage}`);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Loading state - check after all hooks
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -116,7 +152,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Not authenticated
+  // Not authenticated - check after all hooks
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -129,49 +165,17 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Dashboard State
-  const [timeRange, setTimeRange] = useState('7d');
-  const [dashboardData, setDashboardData] = useState<any>(null);
-  const [loadingData, setLoadingData] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch Dashboard Data
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchDashboardData();
-    }
-  }, [isAuthenticated, timeRange]);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoadingData(true);
-      setError(null);
-      // Use the configured api instance which handles tokens
-      const response = await api.get(`/orders/stats/?range=${timeRange}`);
-      setDashboardData(response.data);
-    } catch (err: any) {
-      console.error("Failed to fetch dashboard data", err);
-      // Handle axios error
-      const errorMessage = err.response?.data?.detail ||
-        err.response?.statusText ||
-        "Network or Server Error";
-      setError(`Failed to load data: ${errorMessage}`);
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
   // Process API data or fallback to empty
   const chartData = dashboardData?.chart_data || [];
-  const serviceStats = dashboardData?.service_distribution?.map((item: any, index: number) => ({
+  const serviceStats = dashboardData?.service_distribution?.map((item: { name: string; value: number }, index: number) => ({
     ...item,
     color: ['#6366f1', '#22c55e', '#f59e0b', '#f97316', '#8b5cf6'][index % 5]
   })) || [];
   const branchStats = dashboardData?.branch_performance || [];
-  const recentActivity = dashboardData?.recent_activity?.map((item: any) => ({
+  const recentActivity = (dashboardData?.recent_activity?.map((item: { time: string;[key: string]: unknown }) => ({
     ...item,
     time: new Date(item.time).toLocaleString() // Format time on client
-  })) || [];
+  })) || []) as Activity[];
 
   // Calculate totals from API stats
   const totalOrders = dashboardData?.stats?.total_orders || 0;
@@ -337,9 +341,9 @@ const Dashboard: React.FC = () => {
                               dataKey="value"
                               nameKey="name"
                               labelLine={false}
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                              label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                             >
-                              {serviceStats.map((entry: any, index: number) => (
+                              {serviceStats.map((entry: { name: string; value: number; color: string }, index: number) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
@@ -398,7 +402,7 @@ const Dashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentActivity.map((a: any, idx: number) => (
+                {recentActivity.map((a: Activity, idx: number) => (
                   <div
                     key={idx}
                     className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-800 p-3"

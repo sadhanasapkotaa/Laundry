@@ -138,7 +138,8 @@ const RoleManagement = () => {
     { id: '4', name: 'Jane Customer', email: 'jane@laundry.com', role: 'customer', status: 'active' },
   ];
 
-  const getPermissionsByCategory = (rolePermissions: string[]) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const getPermissionsByCategory = (_rolePermissions: string[]) => {
     const categories: { [key: string]: Permission[] } = {};
 
     permissions.forEach(permission => {

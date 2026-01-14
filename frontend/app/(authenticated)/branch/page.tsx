@@ -1,22 +1,19 @@
 "use client";
 
 import "../../types/i18n";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import {
   FaBuilding,
-  FaUsers,
   FaPhone,
   FaEnvelope,
   FaMapMarkerAlt,
-  FaUser,
   FaEdit,
   FaTrash,
   FaPlus,
   FaSearch,
   FaFilter,
-  FaSort,
   FaEye,
   FaChartLine,
 } from "react-icons/fa";
@@ -49,37 +46,14 @@ export default function BranchManagement() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Performance Chart State
-  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [performanceData, setPerformanceData] = useState<Array<{ branch: string; orders: number; income: number }>>([]);
   const [chartRange, setChartRange] = useState('7d');
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { user } = useAuth();
 
-  useEffect(() => {
-    fetchBranches();
-    fetchPerformanceData();
-  }, []);
-
-  // Fetch performance data when range changes
-  useEffect(() => {
-    fetchPerformanceData();
-  }, [chartRange]);
-
-  const fetchPerformanceData = async () => {
-    try {
-      setLoadingChart(true);
-      const data = await branchAPI.getOverallPerformance(chartRange);
-      setPerformanceData(data);
-    } catch (error) {
-      console.error("Error fetching performance data:", error);
-      // Don't block the whole page if just charts fail, but log it possibly to a toast or just console
-    } finally {
-      setLoadingChart(false);
-    }
-  };
-
-  const fetchBranches = async () => {
+  const fetchBranches = useCallback(async () => {
     try {
       setLoading(true);
       console.log('Starting to fetch branches...');
@@ -102,13 +76,31 @@ export default function BranchManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchPerformanceData = useCallback(async () => {
+    try {
+      setLoadingChart(true);
+      const data = await branchAPI.getOverallPerformance(chartRange);
+      setPerformanceData(data);
+    } catch (error) {
+      console.error("Error fetching performance data:", error);
+      // Don't block the whole page if just charts fail, but log it possibly to a toast or just console
+    } finally {
+      setLoadingChart(false);
+    }
+  }, [chartRange]);
 
   useEffect(() => {
-    filterAndSortBranches();
-  }, [branches, searchTerm, statusFilter, cityFilter, sortBy, sortOrder]);
+    fetchBranches();
+  }, [fetchBranches]);
 
-  const filterAndSortBranches = () => {
+  // Fetch performance data when range changes
+  useEffect(() => {
+    fetchPerformanceData();
+  }, [fetchPerformanceData]);
+
+  useEffect(() => {
     // Ensure branches is an array before filtering
     if (!Array.isArray(branches)) {
       console.warn('Branches is not an array:', branches);
@@ -167,7 +159,7 @@ export default function BranchManagement() {
     });
 
     setFilteredBranches(filtered);
-  };
+  }, [branches, searchTerm, statusFilter, cityFilter, sortBy, sortOrder]);
 
   const handleDeleteBranch = async (branchId: number) => {
     if (user?.role !== 'admin') {
@@ -192,8 +184,6 @@ export default function BranchManagement() {
 
   const totalRevenue = filteredBranches.reduce((sum, b) => sum + b.monthly_revenue, 0);
   const totalExpenses = filteredBranches.reduce((sum, b) => sum + b.monthly_expenses, 0);
-  const totalOrders = filteredBranches.reduce((sum, b) => sum + b.total_orders, 0);
-  const totalStaff = filteredBranches.reduce((sum, b) => sum + b.staff_count, 0);
 
   if (loading) {
     return (

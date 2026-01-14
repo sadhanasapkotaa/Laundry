@@ -33,7 +33,7 @@ export default function OrderPaymentFailurePage() {
                 {/* Information */}
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
                     <p className="text-sm text-yellow-800 dark:text-yellow-400">
-                        <strong>Don't worry!</strong> No charges were made to your account. You can try placing your order again.
+                        <strong>Don&apos;t worry!</strong> No charges were made to your account. You can try placing your order again.
                     </p>
                 </div>
 

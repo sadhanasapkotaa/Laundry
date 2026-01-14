@@ -43,7 +43,7 @@ export default function IncomeTracking() {
   const [typeFilter, setTypeFilter] = useState("all");
 
   // Mock Data
-  const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([
+  const [incomeEntries] = useState<IncomeEntry[]>([
     {
       id: "INC-001",
       amount: 850,
@@ -232,11 +232,10 @@ export default function IncomeTracking() {
                 <td className="p-3 font-semibold">₨ {entry.amount}</td>
                 <td className="p-3">
                   <span
-                    className={`px-2 py-1 text-xs rounded-full ${
-                      entry.mode === "cash"
+                    className={`px-2 py-1 text-xs rounded-full ${entry.mode === "cash"
                         ? "bg-green-100 text-green-800"
                         : "bg-blue-100 text-blue-800"
-                    }`}
+                      }`}
                   >
                     {entry.mode}
                   </span>

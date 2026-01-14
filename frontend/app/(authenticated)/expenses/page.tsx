@@ -1,7 +1,7 @@
 "use client";
 
 import "../../types/i18n";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FaMoneyBillWave, FaPlus, FaTimes, FaFilter, FaSearch, FaEdit, FaTrash, FaTags } from 'react-icons/fa';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -59,7 +59,7 @@ export default function ExpenseTracking() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
-  
+
   const [newExpense, setNewExpense] = useState<NewExpense>({
     category: '',
     branch: '',
@@ -81,40 +81,7 @@ export default function ExpenseTracking() {
   // API base URL - adjust this to match your backend
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-  // Fetch initial data
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  // Apply filters when expenses or filters change
-  useEffect(() => {
-    applyFilters();
-  }, [expenses, filters]);
-
-  const fetchInitialData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch accounting data (branches and categories)
-      const dataResponse = await fetch(`${API_BASE}/accounting/data/`);
-      const dataResult = await dataResponse.json();
-      
-      // Filter only active branches
-      const activeBranches = (dataResult.branches || []).filter((branch: Branch) => branch.status === 'active');
-      setBranches(activeBranches);
-      setCategories(dataResult.expense_categories || []);
-      
-      // Fetch expenses
-      await fetchExpenses();
-      
-    } catch (error) {
-      console.error('Error fetching initial data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/accounting/expenses/`);
       const result = await response.json();
@@ -122,41 +89,75 @@ export default function ExpenseTracking() {
     } catch (error) {
       console.error('Error fetching expenses:', error);
     }
-  };
+  }, [API_BASE]);
 
-  const applyFilters = () => {
-    let filtered = [...expenses];
+  const fetchInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // Fetch accounting data (branches and categories)
+      const dataResponse = await fetch(`${API_BASE}/accounting/data/`);
+      const dataResult = await dataResponse.json();
+
+      if (dataResult.branches) {
+        // Filter only active branches
+        const activeBranches = (dataResult.branches || []).filter((branch: Branch) => branch.status === 'active');
+        setBranches(activeBranches);
+      }
+      if (dataResult.expense_categories) setCategories(dataResult.expense_categories);
+
+      // Fetch expenses
+      await fetchExpenses();
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE, fetchExpenses]);
+
+  const applyFilters = useCallback(() => {
+    let result = [...expenses];
 
     // Apply branch filter
     if (filters.branch) {
-      filtered = filtered.filter(expense => expense.branch === filters.branch);
+      result = result.filter(ex => ex.branch.toString() === filters.branch.toString());
     }
 
     // Apply category filter
     if (filters.category) {
-      filtered = filtered.filter(expense => expense.category === filters.category);
+      result = result.filter(ex => ex.category.toString() === filters.category.toString());
     }
 
     // Apply date range filter
     if (filters.date_from) {
-      filtered = filtered.filter(expense => expense.date_incurred >= filters.date_from);
+      result = result.filter(ex => ex.date_incurred >= filters.date_from);
     }
     if (filters.date_to) {
-      filtered = filtered.filter(expense => expense.date_incurred <= filters.date_to);
+      result = result.filter(ex => ex.date_incurred <= filters.date_to);
     }
 
     // Apply search filter
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(expense => 
-        expense.description.toLowerCase().includes(searchLower) ||
-        expense.category_name.toLowerCase().includes(searchLower) ||
-        expense.branch_name.toLowerCase().includes(searchLower)
+      result = result.filter(ex =>
+        ex.description?.toLowerCase().includes(searchLower) ||
+        ex.category_name.toLowerCase().includes(searchLower) ||
+        ex.branch_name.toLowerCase().includes(searchLower)
       );
     }
 
-    setFilteredExpenses(filtered);
-  };
+    setFilteredExpenses(result);
+  }, [expenses, filters]);
+
+  // Fetch initial data
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  // Apply filters when expenses or filters change
+  useEffect(() => {
+    applyFilters();
+  }, [expenses, filters, applyFilters]);
 
   const handleAddExpense = async () => {
     if (!newExpense.category || !newExpense.branch || !newExpense.amount || !newExpense.date_incurred) {
@@ -166,7 +167,7 @@ export default function ExpenseTracking() {
 
     try {
       const method = editingExpense ? 'PUT' : 'POST';
-      const url = editingExpense 
+      const url = editingExpense
         ? `${API_BASE}/accounting/expenses/${editingExpense.id}/`
         : `${API_BASE}/accounting/expenses/`;
 
@@ -240,14 +241,14 @@ export default function ExpenseTracking() {
       // Fetch latest accounting data (branches and categories)
       const dataResponse = await fetch(`${API_BASE}/accounting/data/`);
       const dataResult = await dataResponse.json();
-      
+
       console.log('Refreshed data:', dataResult); // Debug log
-      
+
       // Filter only active branches
       const activeBranches = (dataResult.branches || []).filter((branch: Branch) => branch.status === 'active');
       setBranches(activeBranches);
       setCategories(dataResult.expense_categories || []);
-      
+
       console.log('Active branches:', activeBranches); // Debug log
       console.log('Categories:', dataResult.expense_categories); // Debug log
     } catch (error) {
@@ -273,7 +274,7 @@ export default function ExpenseTracking() {
 
     try {
       const method = editingCategory ? 'PUT' : 'POST';
-      const url = editingCategory 
+      const url = editingCategory
         ? `${API_BASE}/accounting/expense-categories/${editingCategory.id}/`
         : `${API_BASE}/accounting/expense-categories/`;
 
@@ -414,7 +415,7 @@ export default function ExpenseTracking() {
               <select
                 className="w-full border rounded-lg p-2"
                 value={filters.branch}
-                onChange={(e) => setFilters({...filters, branch: e.target.value ? Number(e.target.value) : ''})}
+                onChange={(e) => setFilters({ ...filters, branch: e.target.value ? Number(e.target.value) : '' })}
               >
                 <option value="">All Branches</option>
                 {branches.map((branch) => (
@@ -429,7 +430,7 @@ export default function ExpenseTracking() {
               <select
                 className="w-full border rounded-lg p-2"
                 value={filters.category}
-                onChange={(e) => setFilters({...filters, category: e.target.value ? Number(e.target.value) : ''})}
+                onChange={(e) => setFilters({ ...filters, category: e.target.value ? Number(e.target.value) : '' })}
               >
                 <option value="">All Categories</option>
                 {categories.map((category) => (
@@ -445,7 +446,7 @@ export default function ExpenseTracking() {
                 type="date"
                 className="w-full border rounded-lg p-2"
                 value={filters.date_from}
-                onChange={(e) => setFilters({...filters, date_from: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
               />
             </div>
             <div>
@@ -454,7 +455,7 @@ export default function ExpenseTracking() {
                 type="date"
                 className="w-full border rounded-lg p-2"
                 value={filters.date_to}
-                onChange={(e) => setFilters({...filters, date_to: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
               />
             </div>
             <div>
@@ -466,7 +467,7 @@ export default function ExpenseTracking() {
                   placeholder="Search description..."
                   className="w-full border rounded-lg p-2 pl-10"
                   value={filters.search}
-                  onChange={(e) => setFilters({...filters, search: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 />
               </div>
             </div>
@@ -685,7 +686,7 @@ export default function ExpenseTracking() {
               <FaTimes />
             </button>
             <h2 className="text-xl font-semibold mb-4">Manage Expense Categories</h2>
-            
+
             {/* Add/Edit Category Form */}
             <div className="bg-gray-50 p-4 rounded-lg mb-4">
               <h3 className="text-lg font-medium mb-3">

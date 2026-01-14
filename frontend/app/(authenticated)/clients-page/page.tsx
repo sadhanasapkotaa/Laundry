@@ -1,6 +1,6 @@
 "use client"
 import React, { useState } from "react";
-import { FiUser, FiPackage, FiSearch, FiPlus, FiPhone, FiMail, FiCalendar } from "react-icons/fi";
+import { FiUser, FiPackage, FiSearch, FiPlus, FiPhone, FiMail } from "react-icons/fi";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, XAxis, YAxis, Bar, Legend } from "recharts";
 
 interface Client {

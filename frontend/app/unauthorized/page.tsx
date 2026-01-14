@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
 import {
   FiShield,
-  FiLock,
   FiHome,
   FiArrowLeft,
   FiLogOut,
@@ -22,36 +21,19 @@ function UnauthorizedContent() {
   const [attemptedAction, setAttemptedAction] = useState<string>("");
   const [requiredRole, setRequiredRole] = useState<string>("");
   const [denialReason, setDenialReason] = useState<string>("");
-  const [requiredPermissions, setRequiredPermissions] = useState<string[]>(
-    []
-  );
 
   useEffect(() => {
     const action = searchParams.get("action") || "access this page";
     const role = searchParams.get("required_role") || "";
     const reason = searchParams.get("reason") || "";
-    const permissions =
-      searchParams.get("required_permissions")?.split(",") || [];
 
     setAttemptedAction(action);
     setRequiredRole(role);
     setDenialReason(reason);
-    setRequiredPermissions(permissions);
   }, [searchParams]);
 
   const handleLogout = () => {
     logout();
-  };
-
-  const getRoleDisplayName = (role: string) => {
-    const roleMap: { [key: string]: string } = {
-      admin: "Administrator",
-      branch_manager: "Branch Manager",
-      accountant: "Accountant",
-      rider: "Rider",
-      customer: "Customer",
-    };
-    return roleMap[role] || role;
   };
 
   const getRecommendedActions = () => {

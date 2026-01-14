@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { FaShoppingCart, FaMapMarkerAlt, FaClock, FaArrowLeft, FaCheck, FaSpinner } from "react-icons/fa";
 import { orderAPI } from "../../../services/orderService";
 import PaymentService from "../../../services/paymentService";
-import { useAuth } from "../../../contexts/AuthContext";
+
 
 interface OrderData {
   branch: number;
@@ -55,37 +55,100 @@ interface OrderData {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user } = useAuth();
+
 
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<"esewa" | "bank" | "cod" | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderNotes, setOrderNotes] = useState("");
 
-  useEffect(() => {
-    // Check for eSewa payment return first (before loading order data)
-    checkEsewaReturn();
+  const createOrder = useCallback(async (data: OrderData, paymentMethod: string, status: string, paymentRef?: string) => {
+    try {
+      // Prepare order data for API
+      const orderRequest = {
+        branch: data.branch,
+        services: data.cart.map(item => ({
+          service_type: item.clothName,
+          material: item.material,
+          quantity: item.quantity,
+          pricing_type: item.clothType,
+          price_per_unit: item.unitPrice,
+          total_price: item.price,
+        })),
+        pickup_enabled: data.services.pickupEnabled,
+        delivery_enabled: data.services.deliveryEnabled,
+        pickup_date: data.pickup?.date || undefined,
+        pickup_time: data.pickup?.time || undefined,
+        pickup_address: data.pickup?.address || undefined,
+        pickup_map_link: data.pickup?.map_link || undefined,
+        delivery_date: data.delivery?.date || undefined,
+        delivery_time: data.delivery?.time || undefined,
+        delivery_address: data.delivery?.address || undefined,
+        delivery_map_link: data.delivery?.map_link || undefined,
+        is_urgent: data.services.isUrgent,
+        total_amount: data.pricing.total,
+        payment_method: paymentMethod as 'cash' | 'bank' | 'esewa',
+        payment_status: status as 'pending' | 'paid' | 'partially_paid',
+        status: 'pending' as const,
+        description: paymentRef ? `${orderNotes}${orderNotes ? ' | ' : ''}Payment Reference: ${paymentRef}` : orderNotes,
+      };
 
-    // Load order data from localStorage
-    const storedOrderData = localStorage.getItem('orderData');
-    if (storedOrderData) {
-      try {
-        const parsedData = JSON.parse(storedOrderData);
-        setOrderData(parsedData);
-      } catch (error) {
-        console.error('Error parsing order data:', error);
-        router.push('/place-orders');
-      }
-    } else {
-      // No order data and no eSewa callback, redirect back to order page
-      const urlParams = new URLSearchParams(window.location.search);
-      if (!urlParams.get('data')) {
-        router.push('/place-orders');
-      }
+      const response = await orderAPI.create(orderRequest);
+      return response;
+    } catch (error) {
+      console.error('Error creating order:', error);
+      throw error;
     }
-  }, [router]);
+  }, [orderNotes]);
 
-  const checkEsewaReturn = () => {
+  const handleEsewaSuccess = useCallback(async (transactionUuid: string, transactionCode: string, amount: number) => {
+    try {
+      setIsProcessing(true);
+
+      // First verify the payment with backend
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
+      const verificationResponse = await fetch(`${API_BASE}/verify-esewa/`, { // Fixed path if needed
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transaction_uuid: transactionUuid,
+          transaction_code: transactionCode,
+          amount: amount.toString(),
+        }),
+      });
+
+      const verificationResult = await verificationResponse.json();
+
+      if (!verificationResult.success) {
+        throw new Error(verificationResult.error || 'Payment verification failed');
+      }
+
+      const storedOrderData = localStorage.getItem('orderData');
+      if (!storedOrderData) {
+        throw new Error('Order data not found');
+      }
+
+      const orderDataParsed = JSON.parse(storedOrderData);
+
+      // Create order with paid status
+      const order = await createOrder(orderDataParsed, 'esewa', 'paid', transactionCode);
+
+      // Clear localStorage
+      localStorage.removeItem('orderData');
+
+      // Navigate to confirmation
+      router.push(`/place-orders/confirmation?orderId=${order.id}&paymentMethod=esewa&paymentRef=${transactionCode}&amount=${amount}`);
+    } catch (error) {
+      console.error('Error processing eSewa success:', error);
+      router.push(`/place-orders/failure?reason=Payment processing failed: ${error}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [createOrder, router]);
+
+  const checkEsewaReturn = useCallback(() => {
     const urlParams = new URLSearchParams(window.location.search);
 
     // Check for failure parameters first
@@ -130,93 +193,32 @@ export default function CheckoutPage() {
         router.push(`/place-orders/failure?reason=Failed to parse payment response`);
       }
     }
-  };
+  }, [handleEsewaSuccess, router]);
 
-  const handleEsewaSuccess = async (transactionUuid: string, transactionCode: string, amount: number) => {
-    try {
-      setIsProcessing(true);
+  useEffect(() => {
+    // Check for eSewa payment return first (before loading order data)
+    checkEsewaReturn();
 
-      // First verify the payment with backend
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
-      const verificationResponse = await fetch(`${API_BASE}/payments/verify-esewa/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transaction_uuid: transactionUuid,
-          transaction_code: transactionCode,
-          amount: amount.toString(),
-        }),
-      });
-
-      const verificationResult = await verificationResponse.json();
-
-      if (!verificationResult.success) {
-        throw new Error(verificationResult.error || 'Payment verification failed');
+    // Load order data from localStorage
+    const storedOrderData = localStorage.getItem('orderData');
+    if (storedOrderData) {
+      try {
+        const parsedData = JSON.parse(storedOrderData);
+        setOrderData(parsedData);
+      } catch (error) {
+        console.error('Error parsing order data:', error);
+        router.push('/place-orders');
       }
-
-      const storedOrderData = localStorage.getItem('orderData');
-      if (!storedOrderData) {
-        throw new Error('Order data not found');
+    } else {
+      // No order data and no eSewa callback, redirect back to order page
+      const urlParams = new URLSearchParams(window.location.search);
+      if (!urlParams.get('data')) {
+        router.push('/place-orders');
       }
-
-      const orderDataParsed = JSON.parse(storedOrderData);
-
-      // Create order with paid status
-      const order = await createOrder(orderDataParsed, 'esewa', 'paid', transactionCode);
-
-      // Clear localStorage
-      localStorage.removeItem('orderData');
-
-      // Navigate to confirmation
-      router.push(`/place-orders/confirmation?orderId=${order.id}&paymentMethod=esewa&paymentRef=${transactionCode}&amount=${amount}`);
-    } catch (error) {
-      console.error('Error processing eSewa success:', error);
-      router.push(`/place-orders/failure?reason=Payment processing failed: ${error}`);
-    } finally {
-      setIsProcessing(false);
     }
-  };
+  }, [router, checkEsewaReturn]);
 
-  const createOrder = async (data: OrderData, paymentMethod: string, status: string, paymentRef?: string) => {
-    try {
-      // Prepare order data for API
-      const orderRequest = {
-        branch: data.branch,
-        services: data.cart.map(item => ({
-          service_type: item.clothName,
-          material: item.material,
-          quantity: item.quantity,
-          pricing_type: item.clothType,
-          price_per_unit: item.unitPrice,
-          total_price: item.price,
-        })),
-        pickup_enabled: data.services.pickupEnabled,
-        delivery_enabled: data.services.deliveryEnabled,
-        pickup_date: data.pickup?.date || undefined,
-        pickup_time: data.pickup?.time || undefined,
-        pickup_address: data.pickup?.address || undefined,
-        pickup_map_link: data.pickup?.map_link || undefined,
-        delivery_date: data.delivery?.date || undefined,
-        delivery_time: data.delivery?.time || undefined,
-        delivery_address: data.delivery?.address || undefined,
-        delivery_map_link: data.delivery?.map_link || undefined,
-        is_urgent: data.services.isUrgent,
-        total_amount: data.pricing.total,
-        payment_method: paymentMethod as 'cash' | 'bank' | 'esewa',
-        payment_status: status as 'pending' | 'paid' | 'unpaid',
-        status: 'pending' as const,
-        description: paymentRef ? `${orderNotes}${orderNotes ? ' | ' : ''}Payment Reference: ${paymentRef}` : orderNotes,
-      };
 
-      const response = await orderAPI.create(orderRequest);
-      return response;
-    } catch (error) {
-      console.error('Error creating order:', error);
-      throw error;
-    }
-  };
 
   const handlePaymentSelection = async (method: "esewa" | "bank" | "cod") => {
     if (!orderData) return;

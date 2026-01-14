@@ -106,19 +106,19 @@ export const branchAPI = {
   },
 
   // Get overall branch performance
-  getOverallPerformance: async (range: string = '7d'): Promise<any[]> => {
+  getOverallPerformance: async (range: string = '7d'): Promise<Array<{ branch: string; orders: number; income: number }>> => {
     const response = await api.get(`/branch/branches/performance/overall/?range=${range}`);
     return response.data;
   },
 
   // Get specific branch performance history
-  getBranchPerformance: async (id: string | number, range: string = '6m'): Promise<any[]> => {
+  getBranchPerformance: async (id: string | number, range: string = '6m'): Promise<Array<{ date: string; orders: number; income: number }>> => {
     const response = await api.get(`/branch/branches/${id}/performance/?range=${range}`);
     return response.data;
   },
 
   // Get specific branch expense breakdown
-  getExpenseBreakdown: async (id: string | number, range: string = '1m'): Promise<any[]> => {
+  getExpenseBreakdown: async (id: string | number, range: string = '1m'): Promise<Array<{ category: string; amount: number }>> => {
     const response = await api.get(`/branch/branches/${id}/expenses/breakdown/?range=${range}`);
     return response.data;
   },

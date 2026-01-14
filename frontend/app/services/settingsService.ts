@@ -138,4 +138,5 @@ export const pricingRuleAPI = {
     },
 };
 
-export default { settingsAPI, washTypeAPI, clothNameAPI, clothTypeAPI, pricingRuleAPI };
+const SettingsService = { settingsAPI, washTypeAPI, clothNameAPI, clothTypeAPI, pricingRuleAPI };
+export default SettingsService;

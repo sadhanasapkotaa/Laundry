@@ -54,7 +54,7 @@ const FitBounds: React.FC<{ coords: [number, number][] }> = ({ coords }) => {
 };
 
 // Helper to extract coordinates from Google Maps/OSM links or address field
-const getCoordinates = (link?: string, address?: string): [number, number] | null => {
+const getCoordinates = (link?: string): [number, number] | null => {
     if (link) {
         // Try to parse standard Google Maps or OSM link params
         // Example: https://www.openstreetmap.org/?mlat=27.6713&mlon=85.3387&zoom=16
@@ -106,7 +106,7 @@ export default function DeliveryMap({ deliveries, height = "400px" }: DeliveryMa
         // I will update the service/serializer in next step.
 
         // Mock logic for parsing if the address string happens to have it, or use the link
-        const coords = getCoordinates((d as any).map_link);
+        const coords = getCoordinates((d as { map_link?: string }).map_link);
         return { ...d, coords, index };
     }).filter(item => item.coords !== null);
 
@@ -116,7 +116,7 @@ export default function DeliveryMap({ deliveries, height = "400px" }: DeliveryMa
         <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style={{ height }}>
             {mapItems.length === 0 ? (
                 <div className="h-full flex items-center justify-center bg-gray-100 text-gray-500">
-                    No location data available for today's tasks.
+                    No location data available for today&apos;s tasks.
                 </div>
             ) : (
                 <MapContainer center={[27.7172, 85.3240]} zoom={13} style={{ height: '100%', width: '100%' }}>

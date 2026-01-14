@@ -1,16 +1,17 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLogin } from '../queries/authQueries';
 import { LoginRequest } from '../types/auth';
+import { UserRole } from '../contexts/AuthContext';
 import { getDefaultRedirectPath } from '../config/permissions';
 
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const Login = () => {
     const router = useRouter();
-    const searchParams = useSearchParams();
+
     const { mutate: login, isPending, error } = useLogin();
     const [showPassword, setShowPassword] = useState(false);
 
@@ -20,7 +21,7 @@ const Login = () => {
     });
 
     // Get redirect URL from query parameters (if user was redirected from a protected page)
-    const redirectTo = searchParams?.get('redirect') || null;
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
@@ -39,7 +40,7 @@ const Login = () => {
                 console.log('User role from response:', data.role);
 
                 // Redirect to role-appropriate dashboard
-                const redirectPath = getDefaultRedirectPath(data.role as any);
+                const redirectPath = getDefaultRedirectPath(data.role as UserRole);
                 console.log('Redirecting to role-based dashboard:', redirectPath);
 
                 // Use router.push for client-side navigation to preserve state

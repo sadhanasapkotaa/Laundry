@@ -27,7 +27,7 @@ interface LocationMarkerProps {
 }
 
 const LocationMarker: React.FC<LocationMarkerProps> = ({ position, setPosition, onLocationSelect }) => {
-  const map = useMapEvents({
+  useMapEvents({
     click(e) {
       const newPosition = { lat: e.latlng.lat, lng: e.latlng.lng };
       setPosition(newPosition);

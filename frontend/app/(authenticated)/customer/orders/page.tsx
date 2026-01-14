@@ -45,7 +45,7 @@ export default function CustomerOrdersPage() {
       const intervalId = setInterval(fetchOrders, 10000);
       return () => clearInterval(intervalId);
     }
-  }, [user]);
+  }, [user, orders.length]);
 
   const handleToggleDetails = (orderId: string) => {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
@@ -279,7 +279,7 @@ export default function CustomerOrdersPage() {
             No orders yet
           </h3>
           <p className="text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-8">
-            It looks like you haven't placed any orders yet. Start your first laundry request now!
+            It looks like you haven&apos;t placed any orders yet. Start your first laundry request now!
           </p>
           <Link
             href="/customer/place-order"

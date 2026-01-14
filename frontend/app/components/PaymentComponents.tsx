@@ -1,5 +1,7 @@
 // Payment components for handling different payment methods
+"use client";
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { PaymentService, PaymentInitiateRequest } from '../services/paymentService';
 
 interface PaymentMethodSelectorProps {
@@ -18,7 +20,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
 
   const handlePayment = async () => {
     setIsProcessing(true);
-    
+
     try {
       const paymentRequest: PaymentInitiateRequest = {
         payment_type: selectedMethod,
@@ -27,7 +29,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
       };
 
       const result = await PaymentService.initiatePayment(paymentRequest);
-      
+
       if (result.success) {
         if (selectedMethod === 'esewa' && result.payment_data && result.esewa_url) {
           // Redirect to eSewa payment gateway
@@ -39,7 +41,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
       } else {
         onPaymentInitiated(result);
       }
-    } catch (error) {
+    } catch {
       onPaymentInitiated({
         success: false,
         error: 'Payment initiation failed',
@@ -111,12 +113,21 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
               <div className="font-medium">eSewa</div>
               <div className="text-sm text-gray-500">Pay instantly with your eSewa wallet</div>
             </div>
-            <div className="text-purple-600">
-              <img src="/esewa-logo.png" alt="eSewa" className="w-8 h-8" onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'block';
-              }} />
-              <div style={{display: 'none'}} className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center text-white text-xs font-bold">eS</div>
+            <div className="text-purple-600 relative w-8 h-8">
+              <Image
+                src="/esewa-logo.png"
+                alt="eSewa"
+                width={32}
+                height={32}
+                className="object-contain"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLElement;
+                  target.style.display = 'none';
+                  const next = target.nextElementSibling as HTMLElement;
+                  if (next) next.style.display = 'flex';
+                }}
+              />
+              <div style={{ display: 'none' }} className="absolute inset-0 bg-purple-600 rounded flex items-center justify-center text-white text-xs font-bold">eS</div>
             </div>
           </label>
         </div>
