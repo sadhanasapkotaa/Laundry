@@ -254,4 +254,4 @@ ESEWA_STATUS_CHECK_URL = 'https://rc.esewa.com.np/api/epay/transaction/status/'
 
 
 # Frontend URL for success/failure redirects
-FRONTEND_URL = 'http://localhost:3000' 
+FRONTEND_URL = 'https://laundry-nine-sooty.vercel.app' 
