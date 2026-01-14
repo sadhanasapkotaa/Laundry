@@ -5,7 +5,6 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { FiMapPin, FiPackage, FiPhone, FiRefreshCw, FiTruck, FiCalendar } from "react-icons/fi";
 import { deliveryAPI, Delivery } from "../../services/deliveryService";
-import { useAuth } from "../../contexts/AuthContext";
 import dynamic from "next/dynamic";
 
 // Dynamically import DeliveryMap to avoid SSR issues
@@ -30,7 +29,6 @@ const TIME_SLOT_LABELS: Record<string, string> = {
 
 export default function DeliveryDashboard() {
     const { t } = useTranslation();
-    const { user: _ } = useAuth();
     const [deliveries, setDeliveries] = useState<Delivery[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

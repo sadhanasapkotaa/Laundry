@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { FaShoppingCart, FaMapMarkerAlt, FaArrowLeft, FaCheck, FaSpinner, FaMoneyBillWave, FaCreditCard, FaUniversity } from "react-icons/fa";
 import { orderAPI } from "../../../../services/orderService";
 import PaymentService from "../../../../services/paymentService";
-import { useAuth } from "../../../../contexts/AuthContext";
 
 interface OrderData {
     branch: number;
@@ -58,7 +57,6 @@ interface OrderData {
 
 export default function CustomerCheckoutPage() {
     const router = useRouter();
-    const { user: _ } = useAuth();
 
     const [orderData, setOrderData] = useState<OrderData | null>(null);
     const [selectedPayment, setSelectedPayment] = useState<"esewa" | "bank" | "cod" | null>(null);
