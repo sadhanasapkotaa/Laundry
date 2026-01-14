@@ -235,8 +235,8 @@ const IncomeTracking = () => {
                 key={period}
                 onClick={() => setSelectedPeriod(period)}
                 className={`px-4 py-1 rounded-md transition-colors ${selectedPeriod === period
-                    ? 'bg-blue-500 text-white'
-                    : 'hover:bg-gray-100'
+                  ? 'bg-blue-500 text-white'
+                  : 'hover:bg-gray-100'
                   }`}
               >
                 {period.charAt(0).toUpperCase() + period.slice(1)}
@@ -328,7 +328,7 @@ const IncomeTracking = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Tooltip formatter={(value: number | string | undefined) => (value !== undefined ? formatCurrency(value) : "")} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -345,7 +345,7 @@ const IncomeTracking = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value: number | string | undefined) => (value !== undefined ? formatCurrency(value) : "")} />
                 <Bar dataKey="income" fill="#3B82F6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -398,10 +398,10 @@ const IncomeTracking = () => {
                       {record.payment_reference ? (
                         <span
                           className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${record.payment_reference.payment_type === 'cash'
-                              ? 'bg-green-100 text-green-800'
-                              : record.payment_reference.payment_type === 'esewa'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-yellow-100 text-yellow-800'
+                            ? 'bg-green-100 text-green-800'
+                            : record.payment_reference.payment_type === 'esewa'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-yellow-100 text-yellow-800'
                             }`}
                         >
                           {record.payment_reference.payment_type === 'cash' ? (

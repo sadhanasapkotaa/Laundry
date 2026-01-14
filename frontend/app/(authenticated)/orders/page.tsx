@@ -232,7 +232,7 @@ export default function OrderManagement(): JSX.Element {
   // For charts: revenue by branch
   const revenueByBranch = useMemo(() => {
     const map = new Map<string, { branchName: string; revenue: number; orders: number }>();
-    
+
     // Filter orders based on time filter
     const now = new Date();
     const filteredOrdersByTime = orders.filter(o => {
@@ -260,11 +260,11 @@ export default function OrderManagement(): JSX.Element {
       cur.revenue += o.amount;
       cur.orders += 1;
     });
-    return Array.from(map.entries()).map(([branchId, v]) => ({ 
-      branchId, 
-      name: v.branchName, 
-      revenue: v.revenue, 
-      orders: v.orders 
+    return Array.from(map.entries()).map(([branchId, v]) => ({
+      branchId,
+      name: v.branchName,
+      revenue: v.revenue,
+      orders: v.orders
     }));
   }, [orders, chartTimeFilter]);
 
@@ -607,10 +607,12 @@ export default function OrderManagement(): JSX.Element {
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
                 <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                <Tooltip 
-                  formatter={(value: number, name: string) => {
-                    if (name === "Revenue (₨)") return [`₨${value.toLocaleString()}`, name];
-                    return [value, name];
+                <Tooltip
+                  formatter={(value: number | string | undefined, name: string | undefined) => {
+                    const numericValue = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
+                    const safeName = name ?? "";
+                    if (safeName === "Revenue (₨)") return [`₨${numericValue.toLocaleString()}`, safeName];
+                    return [numericValue, safeName];
                   }}
                 />
                 <Legend />
